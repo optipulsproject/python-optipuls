@@ -98,23 +98,6 @@ empty_boundary.mark(boundary_markers, 2)
 
 ds = Measure('ds', domain=mesh, subdomain_data=boundary_markers)
 
-# Initial laser control multiplier
-def u(t, t1=0.005, t2=0.010):
-    # return conditional(lt(t, t1), Constant("1.0"),\
-    #            conditional(lt(t, t2), (t2-t)/(t2-t1), Constant("0.0")))
-    if t<t1: return 1.
-    elif t<t2: return (t2-t)/(t2-t1)
-    else: return 0.
-    
-
-def control_to_vector(func=u):
-    '''Convertes the control function to discrete vector.
-    TODO: rewrite with *args'''
-
-    time_space = np.linspace(0, T, num=Nt, endpoint=True)
-    func_vectorized = np.vectorize(func)
-    return func_vectorized(time_space)
-    
 
 # Parameter functions
 def c(theta):    
@@ -164,13 +147,16 @@ def LaserBC(theta, multiplier):
 def EmptyBC(theta):
     return -5*(theta-theta_ext) - 2.26 * 10**(-9)*(theta**4-theta_ext**4)
 
-theta = Function(V)
-theta_old = Function(V)
-v = TestFunction(V)
-theta_old = project(theta_init, V)
-# n = FacetNormal(mesh)
+def u(t, t1=0.005, t2=0.010):
+    if t < t1:
+        return 1.
+    elif t < t2:
+        return (t2-t)/(t2-t1)
+    else:
+        return 0.
 
-control = control_to_vector() 
+time_space = np.linspace(0, T, num=Nt, endpoint=True)
+control = np.vectorize(u)(time_space)
 
 
 def solve_forward(control):
