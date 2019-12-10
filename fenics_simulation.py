@@ -3,7 +3,7 @@ from mshr import *
 import ufl
 import numpy as np
 
-# TODO: MY_EPS -> DOLFIN_EPS
+# TODO: DOLFIN_EPS -> DOLFIN_EPS
 # FIX: EmptyBoundary definition 
 
 # Space and time discretization parameters
@@ -26,7 +26,7 @@ implicitness_coef = Constant("0.0")
 liquidus = 923.0
 solidus = 858.0
 
-MY_EPS = 0.000001
+DOLFIN_EPS = 0.000001
 
 
 class Domain_2(SubDomain):
@@ -47,12 +47,12 @@ class Domain_5(SubDomain):
 
 class LaserBoundary(SubDomain):
     def inside(self, x, on_boundary):            
-        return on_boundary and x[1] > Z-MY_EPS and x[0] < R_laser
+        return on_boundary and x[1] > Z-DOLFIN_EPS and x[0] < R_laser
     
 class EmptyBoundary(SubDomain):
     def inside(self, x, on_boundary):
         return on_boundary and \
-            ((x[1] > Z-MY_EPS and x[0] >= R_laser) or x[1] < MY_EPS)
+            ((x[1] > Z-DOLFIN_EPS and x[0] >= R_laser) or x[1] < DOLFIN_EPS)
 
     
 # Create and refine mesh
