@@ -3,31 +3,33 @@ from mshr import *
 import ufl
 import numpy as np
 
-# TODO: DOLFIN_EPS -> DOLFIN_EPS
-# FIX: EmptyBoundary definition 
+# set_log_level(40)
+
 
 # Space and time discretization parameters
 R = 0.0025
 R_laser = 0.0002
 Z = 0.0005
-T, Nt = 0.005, 100
+T, Nt = 0.015, 150
 dt = T/Nt
 
 # Model constants
 theta_init = Constant("298")
+theta_ext = Constant("298")
 enthalpy = Constant("397000")
-P_YAG = Constant("1600")
-absorb = Constant("0.27")
+P_YAG = 1600.
+absorb = 0.27
 laser_pd = (absorb * P_YAG) / (pi * R_laser**2)
 implicitness = Constant("1.0")
 implicitness_coef = Constant("0.0")
 
+# Optimization parameters
+alpha = 0.0001
+iter_max = 1000
+
 # Aggregate state
 liquidus = 923.0
 solidus = 858.0
-
-DOLFIN_EPS = 0.000001
-
 
 class Domain_2(SubDomain):
     def inside(self, x, on_boundary):
@@ -96,16 +98,20 @@ empty_boundary.mark(boundary_markers, 2)
 
 ds = Measure('ds', domain=mesh, subdomain_data=boundary_markers)
 
-# Laser control multiplier
+# Initial laser control multiplier
 def u(t, t1=0.005, t2=0.010):
-    return conditional(lt(t, t1), Constant("1.0"),\
-               conditional(lt(t, t2), (t2-t)/(t2-t1), Constant("0.0")))
+    # return conditional(lt(t, t1), Constant("1.0"),\
+    #            conditional(lt(t, t2), (t2-t)/(t2-t1), Constant("0.0")))
+    if t<t1: return 1.
+    elif t<t2: return (t2-t)/(t2-t1)
+    else: return 0.
+    
 
 def control_to_vector(func=u):
     '''Convertes the control function to discrete vector.
     TODO: rewrite with *args'''
 
-    time_space = np.linspace(0, T, num=Nt+1, endpoint=True)
+    time_space = np.linspace(0, T, num=Nt, endpoint=True)
     func_vectorized = np.vectorize(func)
     return func_vectorized(time_space)
     
@@ -152,11 +158,11 @@ def lamb(theta):
 
 def LaserBC(theta, multiplier):
     return laser_pd * multiplier \
-           - 5 * (theta-theta_init)\
-           - 2.26 * 10**(-9) * (theta**4-theta_init**4)
+           - 5 * (theta-theta_ext)\
+           - 2.26 * 10**(-9) * (theta**4-theta_ext**4)
 
 def EmptyBC(theta):
-    return -5*(theta-theta_init) - 2.26 * 10**(-9)*(theta**4-theta_init**4)
+    return -5*(theta-theta_ext) - 2.26 * 10**(-9)*(theta**4-theta_ext**4)
 
 theta = Function(V)
 theta_old = Function(V)
@@ -166,25 +172,6 @@ theta_old = project(theta_init, V)
 
 control = control_to_vector() 
 
-# Output file
-outfile = File('../output/fenics/theta.pvd')
-
-
-# Theta = np.zeros((Nt+1,len(V.dofmap().dofs())))
-# # Loop over time steps
-# for k in range(Nt+1):
-#     F = c(theta_old)*rho(theta_old)*(theta-theta_old)*v*x[0]*dx \
-#       + dt*inner(lamb(theta_old) * grad(0.5*(theta+theta_old)), grad(v))*x[0]*dx \
-#       - dt*LaserBC(0.5*(theta+theta_old),Constant(control[k]))*v*x[0]*ds(1) \
-#       - dt*EmptyBC(0.5*(theta+theta_old))*v*x[0]*ds(2)
-
-#     solve(F == 0, theta)
-#     Theta[k,:] = theta.vector().get_local()
-#     theta_old.assign(theta)
-
-#     # Write solution to file
-#     theta.rename("theta", "temperature")
-#     outfile << theta,k
 
 def solve_forward(control):
     '''Calculates the solution to the forward problem with the given control.
@@ -201,6 +188,7 @@ def solve_forward(control):
 
     theta_n = Function(V)
     theta_p = Function(V)
+
     theta_p = project(theta_init, V)
     v = TestFunction(V)
 
@@ -244,33 +232,23 @@ def solve_adjoint(evolution, control):
     evolution_adj = np.zeros((Nt+1,len(V.dofmap().dofs())))
     evolution_adj[Nt,:] = p_next.vector().get_local()
 
-    # solve backward, i.e. p_next -> p_prev
-
     theta_next = Function(V)
     theta_prev = Function(V)
     theta_next_ = Function(V)
 
-    # theta_next_ = project(Constant("0.0"), V)
-
-
+    # solve backward, i.e. p_next -> p_prev
     for k in range(Nt,0,-1):
         theta_next.vector().set_local(evolution[k])
         theta_prev.vector().set_local(evolution[k-1])
-        print('k=',k)
+        # print('k=',k)
 
         F = Constant("0.5") * dt * inner(grad(theta_next),grad(theta_next)) * x[0] * dx\
           + s(theta_prev) * (theta_next - theta_prev) * p_prev * x[0] * dx\
           + dt * inner(lamb(theta_prev) * grad(theta_next), grad(p_prev)) * x[0] * dx\
           - dt * LaserBC(theta_next, Constant(control[k-1])) * p_prev * x[0] * ds(1)\
           - dt * EmptyBC(theta_next) * p_prev * x[0] * ds(2)
-          # \
-          # + s(theta_next) * (theta_next_ - theta_next) * p_next * x[0] * dx\
-          # + dt * inner(lamb(theta_next) * grad(theta_next_), grad(p_next)) * x[0] * dx\
-          # - dt * LaserBC(theta_next_, Constant(control[k])) * p_next * x[0] * ds(1)\
-          # - dt * EmptyBC(theta_next_) * p_next * x[0] * ds(2)
-
+          
         if k < Nt:
-            # print('I am inside')
             theta_next_.vector().set_local(evolution[k+1])
             F += s(theta_next) * (theta_next_ - theta_next) * p_next * x[0] * dx\
                + dt * inner(lamb(theta_next) * grad(theta_next_), grad(p_next)) * x[0] * dx\
@@ -282,60 +260,94 @@ def solve_adjoint(evolution, control):
         evolution_adj[k-1,:] = p.vector().get_local()
         p_next.assign(p)
 
-
     return evolution_adj
 
 
-def solve_adjoint_old(evolution, control):
-    p_ = TrialFunction(V)
+def Dj(evolution_adj, control):
+    '''Calculates the gradient of the cost functional for the given control.
+
+    Parameters:
+        evolution_adj: ndarray
+            The evolution in time of the adjoint state.
+        control: ndarray
+            The laser power coefficient for every time step. 
+
+    Returns:
+        Dj: ndarray
+            The gradient of the cost functional.
+    '''
+
     p = Function(V)
-    p_old = project(Constant("0.0"), V)
-    v = TestFunction(V)
+    z = np.zeros(Nt)
 
-    evolution_adj = np.zeros((Nt+1,len(V.dofmap().dofs())))
-    evolution_adj[Nt,:] = p_old.vector().get_local()
+    for i in range(Nt):
+        p.vector().set_local(evolution_adj[i])
+        z[i] = assemble(p*ds(1))
+    
+    Dj = alpha*control - laser_pd*z
+
+    return Dj
+
+def gradient_descent(control):
+    '''Calculates the optimal control.
+
+    Parameters:
+        control: ndarray
+            Initial guess.
+
+    Returns:
+        control_optimal: ndarray
+
+    '''
+
+    evolution = solve_forward(control)
+    cost = J(evolution, control)
+    s = 1.
+
+    for i in range(iter_max):
+        
+        print('Step {}: j(u)={}'.format(i,cost))
+
+        evolution_adj = solve_adjoint(evolution, control)
+        D = Dj(evolution_adj, control)
+        
+        control_next = np.clip(control - s*D, 0, 1)
+        evolution_next = solve_forward(control_next)
+        cost_next = J(evolution_next, control_next)
+        print('s={}, j(u) -> {}'.format(s,cost_next))
+
+        while cost_next >= cost:
+            s /= 2
+            control_next = np.clip(control - s*D, 0, 1)
+            evolution_next = solve_forward(control_next)
+            cost_next = J(evolution_next, control_next)
+            print('s={}, j(u) -> {}'.format(s,cost_next))
+
+        s *= 2
+        control = control_next
+        cost = cost_next
+        evolution = evolution_next
+
+    return control_next
 
 
-    for k in range(Nt-1,-1,-1):
-        theta_new = Function(V)
-        theta_old = Function(V)
-        theta_older = Function(V)
+def J(evolution, control):
+    cost = 0.
+    theta = Function(V)
 
-        theta_new.vector().set_local(evolution[k])
-        theta_old.vector().set_local(evolution[k+1])
-        if k <= Nt-2: theta_older.vector().set_local(evolution[k+2])
+    for k in range(Nt):
+        theta.vector().set_local(evolution[k])
+        cost += .5 * dt *\
+            (assemble(inner(grad(theta),grad(theta)) * x[0] * dx))
 
-        F = c(theta_new)*rho(theta_new)*(theta_old-theta_new)*p_*x[0]*dx \
-          + dt*inner(lamb(theta_new) * grad(0.5*(theta_old+theta_new)), grad(p_))*x[0]*dx \
-          - dt*LaserBC(0.5*(theta_old+theta_new),Constant(control[k]))*p_*x[0]*ds(1) \
-          - dt*EmptyBC(0.5*(theta_old+theta_new))*p_*x[0]*ds(2)
-          # + c(theta_new)*rho(theta_new) * p_*v*x[0]*dx 
+    cost += .5 * dt * alpha * np.sum(control**2)
 
-        R = - dt * inner(grad(theta_old), grad(v)) * x[0] * dx
+    return cost
 
-        if k <= Nt-2:
-            R -= derivative(\
-                  c(theta_old)*rho(theta_old)*(theta_older-theta_old)*p_old*x[0]*dx \
-                  + dt*inner(lamb(theta_old) * grad(0.5*(theta_older+theta_old)), grad(p_old))*x[0]*dx \
-                  - dt*LaserBC(0.5*(theta_older+theta_old),Constant(control[k]))*p_old*x[0]*ds(1) \
-                  - dt*EmptyBC(0.5*(theta_older+theta_old))*p_old*x[0]*ds(2),\
-                  theta_old,v)
-
-            # R += derivative(c(theta_old)*rho(theta_old) * p_old*(theta_older-theta_old)*dx, theta_old, v)
-
-        G = derivative(F,theta_old,v)
-        solve(G==R, p)
-
-        evolution_adj[k,:] = p.vector().get_local()
-        p_old.assign(p)
-
-    return evolution_adj
-
-
-evolution = solve_forward(control)
-save_as_pvd(evolution,'../output/evo.pvd')
-evolution_adj = solve_adjoint(evolution,control)
-save_as_pvd(evolution_adj,'../output/evo_adj.pvd')
+# evolution = solve_forward(control)
+# save_as_pvd(evolution,'../output/evo.pvd')
+# evolution_adj = solve_adjoint(evolution,control)
+# save_as_pvd(evolution_adj,'../output/evo_adj.pvd')
 
 # save_as_npy(evolution, '../output/evo.npy')
 # evolution = np.load('../output/evo.npy')
