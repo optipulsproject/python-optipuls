@@ -52,7 +52,7 @@ class LaserBoundary(SubDomain):
 class EmptyBoundary(SubDomain):
     def inside(self, x, on_boundary):
         return on_boundary and \
-            ((x[1] > 50-MY_EPS and x[0] >= R_laser) or x[1] < MY_EPS)
+            ((x[1] > Z-MY_EPS and x[0] >= R_laser) or x[1] < MY_EPS)
 
     
 # Create and refine mesh
