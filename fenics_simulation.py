@@ -320,15 +320,43 @@ def gradient_descent(control):
 def J(evolution, control):
     cost = 0.
     theta = Function(V)
+    theta_ref = Function(V)
 
-    for k in range(Nt):
+    for k in range(1,Nt+1):
         theta.vector().set_local(evolution[k])
+        theta_ref.vector().set_local(evolution_ref[k])
         cost += .5 * dt *\
-            (assemble(inner(grad(theta),grad(theta)) * x[0] * dx))
+            assemble((theta-theta_ref)**2 * x[0] * dx)
 
-    cost += .5 * dt * alpha * np.sum(control**2)
+    cost += .5 * dt * alpha * np.sum((control-control_ref)**2)
 
     return cost
+
+def gradient_test(control):
+    evolution = solve_forward(control)
+    evolution_adj = solve_adjoint(evolution, control)
+    # direction = np.random.rand(Nt)
+    # direction_norm = dt * np.sum(direction**2)
+    # direction /= direction_norm
+    direction = np.empty(Nt)
+    direction[:] = 0.1
+
+    D = Dj(evolution_adj, control)
+
+    print('  epsilon            grad               derivative         delta')
+
+    for epsilon in [2**-k for k in range(5)]:
+        scalar_product = dt * np.sum(D*direction)
+        evolution_eps = solve_forward(control + epsilon * direction)
+        derivative = (J(evolution_eps, control + epsilon * direction) -\
+                      J(evolution, control)) / epsilon
+        delta = scalar_product - derivative
+        print('{:18.15f} {:18.15f} {:18.15f} {:18.15f}'.format(epsilon, scalar_product, derivative, delta))
+
+
+control_ref = np.load('test/control_30.npy')
+evolution_ref = np.load('test/evo_30.npy')
+
 
 # evolution = solve_forward(control)
 # save_as_pvd(evolution,'../output/evo.pvd')
