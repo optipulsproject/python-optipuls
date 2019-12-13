@@ -29,7 +29,7 @@ implicitness_coef = Constant("0.0")
 # Optimization parameters
 alpha = 0.0001
 iter_max = 5
-tolerance = 10**-6
+tolerance = 10**-18
 
 # Aggregate state
 liquidus = 923.0
@@ -277,40 +277,47 @@ def Dj(evolution_adj, control):
 
     return Dj
 
-def gradient_descent(control):
+def gradient_descent(control, iter_max=100, s=512.):
     '''Calculates the optimal control.
 
     Parameters:
         control: ndarray
             Initial guess.
+        iter_max: integer
+            The maximal allowed number of iterations.
 
     Returns:
         control_optimal: ndarray
 
     '''
 
+    # TODO: change the breaking condition
+
     evolution = solve_forward(control)
     cost = J(evolution, control)
-    s = 512.
+    cost_next = cost
+
+    print('{:>4} {:>12} {:>14} {:>14}'.format('i', 's', 'j', 'norm'))
 
     for i in range(iter_max):
         
-        print('Step {}: j(u)={}'.format(i,cost))
-
         evolution_adj = solve_adjoint(evolution, control)
         D = Dj(evolution_adj, control)
+        norm = dt * np.sum(D**2)
         
-        control_next = np.clip(control - s*D, 0, 1)
-        evolution_next = solve_forward(control_next)
-        cost_next = J(evolution_next, control_next)
-        print('s={}, j(u) -> {}'.format(s,cost_next))
+        if norm < tolerance:
+            print('norm < tolerance')
+            break
 
-        while cost_next >= cost:
-            s /= 2
+        first_try = True
+        while (cost_next >= cost) or first_try:
             control_next = np.clip(control - s*D, 0, 1)
             evolution_next = solve_forward(control_next)
             cost_next = J(evolution_next, control_next)
-            print('s={}, j(u) -> {}'.format(s,cost_next))
+            print('{:4} {:12.6f} {:14.7e} {:14.7e}'.\
+                format(i, s, cost_next, norm))
+            if not first_try: s /= 2
+            first_try = False
 
         s *= 2
         control = control_next
