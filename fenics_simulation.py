@@ -29,6 +29,7 @@ implicitness_coef = Constant("0.0")
 # Optimization parameters
 alpha = 0.0001
 iter_max = 5
+tolerance = 10**-6
 
 # Aggregate state
 liquidus = 923.0
@@ -290,7 +291,7 @@ def gradient_descent(control):
 
     evolution = solve_forward(control)
     cost = J(evolution, control)
-    s = 1.
+    s = 512.
 
     for i in range(iter_max):
         
