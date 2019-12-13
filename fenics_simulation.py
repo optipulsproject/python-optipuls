@@ -2,15 +2,18 @@ from dolfin import *
 from mshr import *
 import ufl
 import numpy as np
+from matplotlib import pyplot as plt
 
-# set_log_level(40)
+from visualization import control_plot, gradient_test_plot
+
+set_log_level(40)
 
 
 # Space and time discretization parameters
 R = 0.0025
 R_laser = 0.0002
 Z = 0.0005
-T, Nt = 0.015, 150
+T, Nt = 0.015, 30
 dt = T/Nt
 
 # Model constants
@@ -25,7 +28,8 @@ implicitness_coef = Constant("0.0")
 
 # Optimization parameters
 alpha = 0.0001
-iter_max = 1000
+iter_max = 5
+tolerance = 10**-6
 
 # Aggregate state
 liquidus = 923.0
@@ -154,10 +158,7 @@ def u(t, t1=0.005, t2=0.010):
         return (t2-t)/(t2-t1)
     else:
         return 0.
-
-time_space = np.linspace(0, T, num=Nt, endpoint=True)
-control = np.vectorize(u)(time_space)
-
+ 
 
 def solve_forward(control):
     '''Calculates the solution to the forward problem with the given control.
@@ -214,6 +215,7 @@ def solve_adjoint(evolution, control):
     p_next = project(Constant("0.0"), V)
     p = Function(V)
     v = TestFunction(V)
+    theta_ref = Function(V)
 
     evolution_adj = np.zeros((Nt+1,len(V.dofmap().dofs())))
     evolution_adj[Nt,:] = p_next.vector().get_local()
@@ -226,9 +228,10 @@ def solve_adjoint(evolution, control):
     for k in range(Nt,0,-1):
         theta_next.vector().set_local(evolution[k])
         theta_prev.vector().set_local(evolution[k-1])
+        theta_ref.vector().set_local(evolution_ref[k])
         # print('k=',k)
 
-        F = Constant("0.5") * dt * inner(grad(theta_next),grad(theta_next)) * x[0] * dx\
+        F = Constant("0.5") * dt * (theta_next-theta_ref)**2 * x[0] * dx\
           + s(theta_prev) * (theta_next - theta_prev) * p_prev * x[0] * dx\
           + dt * inner(lamb(theta_prev) * grad(theta_next), grad(p_prev)) * x[0] * dx\
           - dt * LaserBC(theta_next, Constant(control[k-1])) * p_prev * x[0] * ds(1)\
@@ -270,7 +273,7 @@ def Dj(evolution_adj, control):
         p.vector().set_local(evolution_adj[i])
         z[i] = assemble(p * x[0] * ds(1))
     
-    Dj = alpha*control - laser_pd*z
+    Dj = alpha*(control-control_ref) - laser_pd*z
 
     return Dj
 
@@ -288,7 +291,7 @@ def gradient_descent(control):
 
     evolution = solve_forward(control)
     cost = J(evolution, control)
-    s = 1.
+    s = 512.
 
     for i in range(iter_max):
         
@@ -332,36 +335,41 @@ def J(evolution, control):
 
     return cost
 
-def gradient_test(control):
+def gradient_test(control, n=10):
     evolution = solve_forward(control)
     evolution_adj = solve_adjoint(evolution, control)
+    direction = np.cos(time_space*np.pi / (2*T))
     # direction = np.random.rand(Nt)
-    # direction_norm = dt * np.sum(direction**2)
-    # direction /= direction_norm
-    direction = np.empty(Nt)
-    direction[:] = 0.1
 
     D = Dj(evolution_adj, control)
+    print('{:>14} {:>14} {:>14} {:>14}'.\
+        format('epsilon', 'grad', 'derivative', 'delta'))
 
-    print('  epsilon            grad               derivative         delta')
+    values_eps = []
+    values_delta = []
 
-    for epsilon in [2**-k for k in range(5)]:
+    for epsilon in [2**-k for k in range(n)]:
         scalar_product = dt * np.sum(D*direction)
         evolution_eps = solve_forward(control + epsilon * direction)
         derivative = (J(evolution_eps, control + epsilon * direction) -\
                       J(evolution, control)) / epsilon
         delta = scalar_product - derivative
-        print('{:18.15f} {:18.15f} {:18.15f} {:18.15f}'.format(epsilon, scalar_product, derivative, delta))
+        values_eps.append(epsilon)
+        values_delta.append(delta)
+        print('{:14.7e} {:14.7e} {:14.7e} {:14.7e}'.\
+            format(epsilon, scalar_product, derivative, delta))
+
+    return values_eps, values_delta
 
 
-control_ref = np.load('test/control_30.npy')
-evolution_ref = np.load('test/evo_30.npy')
+# control = np.random.rand(Nt)
+time_space = np.linspace(0, T, num=Nt, endpoint=True)
+control = np.sin(time_space*np.pi / (2*T))
+control_ref = np.vectorize(u)(time_space)
 
+evolution_ref = solve_forward(control_ref)
 
-# evolution = solve_forward(control)
-# save_as_pvd(evolution,'../output/evo.pvd')
-# evolution_adj = solve_adjoint(evolution,control)
-# save_as_pvd(evolution_adj,'../output/evo_adj.pvd')
+# optimal = gradient_descent(control)
 
-# save_as_npy(evolution, '../output/evo.npy')
-# evolution = np.load('../output/evo.npy')
+# control_plot(control_ref, control, optimal)
+
