@@ -4,6 +4,8 @@ import ufl
 import numpy as np
 from matplotlib import pyplot as plt
 
+from visualization import control_plot, gradient_test_plot
+
 set_log_level(40)
 
 
@@ -366,24 +368,7 @@ control_ref = np.vectorize(u)(time_space)
 
 evolution_ref = solve_forward(control_ref)
 
-optimal = gradient_descent(control)
+# optimal = gradient_descent(control)
 
+# control_plot(control_ref, control, optimal)
 
-fig, ax = plt.subplots()
-ax.set_title('Optimization test')
-
-x_dots = np.arange(Nt)
-ax.set_xticks(x_dots)
-
-ax.scatter(x_dots, control_ref, color='purple', zorder=1, label='Reference control')
-ax.plot(control_ref, color='purple', zorder=1)
-ax.scatter(x_dots, control, color='gray', zorder=2, alpha=0.5, label='Initial guess')
-ax.plot(control, color='gray', zorder=2, alpha=0.5)
-ax.scatter(x_dots, optimal, color='blue', zorder=3, label='Optimized control')
-ax.plot(optimal, color='blue', zorder=3)
-
-ax.fill_between(x_dots, optimal, control_ref, alpha=0.2, color='blue')
-
-ax.legend(loc=2)
-
-plt.show()
