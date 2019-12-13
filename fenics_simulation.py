@@ -268,7 +268,7 @@ def Dj(evolution_adj, control):
 
     for i in range(Nt):
         p.vector().set_local(evolution_adj[i])
-        z[i] = assemble(p*ds(1))
+        z[i] = assemble(p * x[0] * ds(1))
     
     Dj = alpha*(control-control_ref) - laser_pd*z
 
