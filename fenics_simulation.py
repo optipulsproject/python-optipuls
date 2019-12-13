@@ -332,26 +332,31 @@ def J(evolution, control):
 
     return cost
 
-def gradient_test(control):
+def gradient_test(control, n=10):
     evolution = solve_forward(control)
     evolution_adj = solve_adjoint(evolution, control)
+    direction = np.cos(time_space*np.pi / (2*T))
     # direction = np.random.rand(Nt)
-    # direction_norm = dt * np.sum(direction**2)
-    # direction /= direction_norm
-    direction = np.empty(Nt)
-    direction[:] = 0.1
 
     D = Dj(evolution_adj, control)
+    print('{:>14} {:>14} {:>14} {:>14}'.\
+        format('epsilon', 'grad', 'derivative', 'delta'))
 
-    print('  epsilon            grad               derivative         delta')
+    values_eps = []
+    values_delta = []
 
-    for epsilon in [2**-k for k in range(5)]:
+    for epsilon in [2**-k for k in range(n)]:
         scalar_product = dt * np.sum(D*direction)
         evolution_eps = solve_forward(control + epsilon * direction)
         derivative = (J(evolution_eps, control + epsilon * direction) -\
                       J(evolution, control)) / epsilon
         delta = scalar_product - derivative
-        print('{:18.15f} {:18.15f} {:18.15f} {:18.15f}'.format(epsilon, scalar_product, derivative, delta))
+        values_eps.append(epsilon)
+        values_delta.append(delta)
+        print('{:14.7e} {:14.7e} {:14.7e} {:14.7e}'.\
+            format(epsilon, scalar_product, derivative, delta))
+
+    return values_eps, values_delta
 
 
 # control = np.random.rand(Nt)
