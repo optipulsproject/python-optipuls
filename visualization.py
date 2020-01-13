@@ -35,7 +35,7 @@ def gradient_test_plot(values_eps, values_delta):
 
     values_delta = [abs(x) for x in values_delta]
 
-    axes.set_ylim([0,1.1 * values_delta.max()])
+    ax.set_ylim([0,1.1 * max(values_delta)])
 
     # ax.scatter(values_eps, values_delta, color='red', zorder=2)
     ax.plot(values_eps, values_delta, color='blue', zorder=1)
