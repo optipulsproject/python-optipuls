@@ -224,6 +224,9 @@ def solve_adjoint(evolution, control):
     theta_prev = Function(V)
     theta_next_ = Function(V)
 
+    theta_m = implicitness*theta_next + (1-implicitness)*theta_prev
+    theta_m_ = implicitness*theta_next_ + (1-implicitness)*theta_next
+
     # solve backward, i.e. p_next -> p_prev
     for k in range(Nt,0,-1):
         theta_next.vector().set_local(evolution[k])
@@ -233,16 +236,16 @@ def solve_adjoint(evolution, control):
 
         F = Constant("0.5") * dt * (theta_next-theta_ref)**2 * x[0] * dx\
           + s(theta_prev) * (theta_next - theta_prev) * p_prev * x[0] * dx\
-          + dt * inner(lamb(theta_prev) * grad(theta_next), grad(p_prev)) * x[0] * dx\
-          - dt * LaserBC(theta_next, Constant(control[k-1])) * p_prev * x[0] * ds(1)\
-          - dt * EmptyBC(theta_next) * p_prev * x[0] * ds(2)
+          + dt * inner(lamb(theta_prev) * grad(theta_m), grad(p_prev)) * x[0] * dx\
+          - dt * LaserBC(theta_m, Constant(control[k-1])) * p_prev * x[0] * ds(1)\
+          - dt * EmptyBC(theta_m) * p_prev * x[0] * ds(2)
           
         if k < Nt:
             theta_next_.vector().set_local(evolution[k+1])
             F += s(theta_next) * (theta_next_ - theta_next) * p_next * x[0] * dx\
-               + dt * inner(lamb(theta_next) * grad(theta_next_), grad(p_next)) * x[0] * dx\
-               - dt * LaserBC(theta_next_, Constant(control[k])) * p_next * x[0] * ds(1)\
-               - dt * EmptyBC(theta_next_) * p_next * x[0] * ds(2)
+               + dt * inner(lamb(theta_next) * grad(theta_m_), grad(p_next)) * x[0] * dx\
+               - dt * LaserBC(theta_m_, Constant(control[k])) * p_next * x[0] * ds(1)\
+               - dt * EmptyBC(theta_m_) * p_next * x[0] * ds(2)
 
         dF = derivative(F,theta_next,v)
         solve(lhs(dF)==rhs(dF),p)
@@ -379,4 +382,3 @@ evolution_ref = solve_forward(control_ref)
 # optimal = gradient_descent(control)
 
 # control_plot(control_ref, control, optimal)
-
