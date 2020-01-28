@@ -106,22 +106,22 @@ ds = Measure('ds', domain=mesh, subdomain_data=boundary_markers)
 
 
 # discete values for c(theta) Hermite interpolation spline
-knots = np.array([273,373,473,573,673,773,858,890,923,973,1073])
-values = np.array([896,925,958,990,1016,1040,1058,11000,1070,1070,1070])
+knots_c = np.array([273,373,473,573,673,773,858,890,923,973,1073])
+values_c = np.array([896,925,958,990,1016,1040,1058,11000,1070,1070,1070])
 
-spline = spl.gen_hermite_spline(knots,values)
+spline_c = spl.gen_hermite_spline(knots_c,values_c)
 
 def c(theta):
     result = 0
 
-    for i in range(len(spline)-1):
-        x_p = Constant(knots[i])
-        x_n = Constant(knots[i+1])
+    for i in range(len(spline_c)-1):
+        x_p = Constant(knots_c[i])
+        x_n = Constant(knots_c[i+1])
         result += conditional(ufl.And(ge(theta,x_p),lt(theta,x_n)), 1., 0.)\
-                    * Polynomial(spline[i])(theta)
+                    * Polynomial(spline_c[i])(theta)
 
-    result += conditional(ge(theta,Constant(knots[-1])), 1., 0.)\
-                * Polynomial(spline[-1])(theta)
+    result += conditional(ge(theta,Constant(knots_c[-1])), 1., 0.)\
+                * Polynomial(spline_c[-1])(theta)
     
     return result
 
@@ -131,30 +131,39 @@ def rho(theta):
 def s(theta):
     return c(theta)*rho(theta)
 
+# discete values for lamb(theta) Hermite interpolation spline
+knots_lamb = np.array([273,373,473,573,673,773,858,923])
+values_lamb_rad = np.array([177,182,187,193,198,200,200,400])
+values_lamb_ax = np.array([177,182,187,193,198,200,200,100])
+
+spline_lamb_rad = spl.gen_hermite_spline(knots_lamb,values_lamb_rad)
+spline_lamb_ax = spl.gen_hermite_spline(knots_lamb,values_lamb_ax)
+
 def lamb(theta):
-    k_solid, b_solid = 0.05, 163.2
-    k_rad_mash, b_rad_mash = 3.14, -2486.8
-    k_ax_mash, b_ax_mash = -1.63, 1605.2
+    radial = 0
 
-    solid = (theta < 858)
-    mash = (858 <= theta) * (theta < 923)
-    liquid = (923 < theta)
+    for i in range(len(spline_lamb_rad)-1):
+        x_p = Constant(knots_lamb[i])
+        x_n = Constant(knots_lamb[i+1])
+        radial += conditional(ufl.And(ge(theta,x_p),lt(theta,x_n)), 1., 0.)\
+                    * Polynomial(spline_lamb_rad[i])(theta)
 
-    lambda_rad = conditional(lt(theta,858),\
-        (k_solid * theta + b_solid), Constant("0.0"))
-    lambda_ax = conditional(lt(theta,858),\
-        (k_solid * theta + b_solid), Constant("0.0"))
-    lambda_rad += conditional(ufl.And(ge(theta,858), le(theta,923)),\
-        k_rad_mash * theta + b_rad_mash, Constant("0.0"))    
-    lambda_ax += conditional(ufl.And(ge(theta,858), lt(theta, 923)),\
-        k_ax_mash * theta + b_ax_mash, Constant("0.0"))
-    lambda_rad += conditional(ge(theta,923), Constant("410."), Constant("0.0"))
-    lambda_ax += conditional(ge(theta,923), Constant("100."), Constant("0.0"))
+    radial += conditional(ge(theta,Constant(knots_lamb[-1])), 1., 0.)\
+                * Polynomial(spline_lamb_rad[-1])(theta)
 
-    # return as_matrix([[lambda_rad, Constant("0.0")],\
-    #         [Constant("0.0"), lambda_ax]])
-    return as_matrix([[Constant("150.0"), Constant("0.0")],\
-            [Constant("0.0"), Constant("150.0")]])
+    axial = 0
+
+    for i in range(len(spline_lamb_ax)-1):
+        x_p = Constant(knots_lamb[i])
+        x_n = Constant(knots_lamb[i+1])
+        axial += conditional(ufl.And(ge(theta,x_p),lt(theta,x_n)), 1., 0.)\
+                    * Polynomial(spline_lamb_ax[i])(theta)
+
+    axial += conditional(ge(theta,Constant(knots_lamb[-1])), 1., 0.)\
+                * Polynomial(spline_lamb_ax[-1])(theta)
+    
+    return as_matrix([[radial, Constant("0.0")],\
+                      [Constant("0.0"), axial]])
 
 def LaserBC(theta, multiplier):
     return laser_pd * multiplier \
@@ -387,7 +396,7 @@ def gradient_test(control, n=10):
 
 # control = np.random.rand(Nt)
 time_space = np.linspace(0, T, num=Nt, endpoint=True)
-control = np.sin(time_space*np.pi / (2*T))
+control = np.cos(time_space*np.pi / (2*T))
 control_ref = np.vectorize(u)(time_space)
 
 evolution_ref = solve_forward(control_ref)
