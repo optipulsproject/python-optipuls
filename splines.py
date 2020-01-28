@@ -51,7 +51,7 @@ def gen_hermite_spline(knots, values, extrapolation='constant'):
     if extrapolation=='constant':
         spline[-1] = values[-1], 0, 0, 0
     elif extrapolation=='linear':
-        k = spline[-2].deriv()(knots[-1])
+        k = Polynomial(spline[-2]).deriv()(knots[-1])
         spline[-1] = values[-1], k, 0, 0
 
     return spline
