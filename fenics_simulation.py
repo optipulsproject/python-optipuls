@@ -3,8 +3,10 @@ from mshr import *
 import ufl
 import numpy as np
 from matplotlib import pyplot as plt
+from numpy.polynomial import Polynomial
 
 from visualization import control_plot, gradient_test_plot
+import splines as spl
 
 set_log_level(40)
 
@@ -103,15 +105,26 @@ empty_boundary.mark(boundary_markers, 2)
 ds = Measure('ds', domain=mesh, subdomain_data=boundary_markers)
 
 
-# Parameter functions
-def c(theta):    
-    # c_lin = conditional(gt(theta, liquidus), 1085, 822.719+0.281273*theta)
-    c_lin = conditional(gt(theta, liquidus), 1085., 0.) +\
-            conditional(gt(theta, liquidus), 0., 1.0) * (822.719+0.281273*theta)
-    c_melting = conditional(gt(theta, liquidus), Constant("0.0"),\
-        enthalpy*exp(-0.5*((theta-890.5)/8)**2) / sqrt(2*pi*64))
-    return c_lin #+ c_melting
+# discete values for c(theta) Hermite interpolation spline
+knots = np.array([273,373,473,573,673,773,858,890,923,973,1073])
+values = np.array([896,925,958,990,1016,1040,1058,11000,1070,1070,1070])
+
+spline = spl.gen_hermite_spline(knots,values)
+
+def c(theta):
+    result = 0
+
+    for i in range(len(spline)-1):
+        x_p = Constant(knots[i])
+        x_n = Constant(knots[i+1])
+        result += conditional(ufl.And(ge(theta,x_p),lt(theta,x_n)), 1., 0.)\
+                    * Polynomial(spline[i])(theta)
+
+    result += conditional(ge(theta,Constant(knots[-1])), 1., 0.)\
+                * Polynomial(spline[-1])(theta)
     
+    return result
+
 def rho(theta):
     return Constant("2800")
 
