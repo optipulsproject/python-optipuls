@@ -125,8 +125,25 @@ def c(theta):
     
     return result
 
+knots_rho = np.array([273,373,473,573,673,773,858,923,973,1073,1173])
+values_rho = np.array([2750,2730,2710,2690,2670,2650,2630,2450,2440,2430,2420])
+
+spline_rho = spl.gen_hermite_spline(\
+                knots_rho, values_rho, extrapolation='linear')
+
 def rho(theta):
-    return Constant("2800")
+    result = 0
+
+    for i in range(len(spline_rho)-1):
+        x_p = Constant(knots_rho[i])
+        x_n = Constant(knots_rho[i+1])
+        result += conditional(ufl.And(ge(theta,x_p),lt(theta,x_n)), 1., 0.)\
+                    * Polynomial(spline_rho[i])(theta)
+
+    result += conditional(ge(theta,Constant(knots_rho[-1])), 1., 0.)\
+                * Polynomial(spline_rho[-1])(theta)
+    
+    return result
 
 def s(theta):
     return c(theta)*rho(theta)
