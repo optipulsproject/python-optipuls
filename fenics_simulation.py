@@ -5,6 +5,8 @@ import numpy as np
 from matplotlib import pyplot as plt
 from numpy.polynomial import Polynomial
 
+from tqdm import trange
+
 from visualization import control_plot, gradient_test_plot
 import splines as spl
 
@@ -15,15 +17,15 @@ set_log_level(40)
 R = 0.0025
 R_laser = 0.0002
 Z = 0.0005
-T, Nt = 0.015, 30
+T, Nt = 0.018, 900
 dt = T/Nt
 
 # Model constants
-theta_init = Constant("298")
-theta_ext = Constant("298")
+theta_init = Constant("295")
+theta_ext = Constant("295")
 enthalpy = Constant("397000")
 P_YAG = 1600.
-absorb = 0.27
+absorb = 0.135
 laser_pd = (absorb * P_YAG) / (pi * R_laser**2)
 implicitness = Constant("1.0")
 implicitness_coef = Constant("0.0")
@@ -184,11 +186,12 @@ def lamb(theta):
 
 def LaserBC(theta, multiplier):
     return laser_pd * multiplier \
-           - 5 * (theta-theta_ext)\
+           - 20 * (theta-theta_ext)\
            - 2.26 * 10**(-9) * (theta**4-theta_ext**4)
 
 def EmptyBC(theta):
-    return -5*(theta-theta_ext) - 2.26 * 10**(-9)*(theta**4-theta_ext**4)
+    return - 20 * (theta-theta_ext)\
+           - 2.26 * 10**(-9) * (theta**4-theta_ext**4)
 
 def u(t, t1=0.005, t2=0.010):
     if t < t1:
@@ -223,7 +226,7 @@ def solve_forward(control):
 
     theta_m = implicitness*theta_n + (1-implicitness)*theta_p
 
-    for k in range(Nt):
+    for k in trange(Nt):
         F = s(theta_p) * (theta_n-theta_p) * v * x[0] * dx \
           + dt * inner(lamb(theta_p) * grad(theta_m), grad(v)) * x[0] * dx \
           - dt * LaserBC(theta_m, Constant(control[k])) * v * x[0] * ds(1) \
@@ -412,12 +415,11 @@ def gradient_test(control, n=10):
 
 
 # control = np.random.rand(Nt)
+# control = np.cos(time_space*np.pi / (2*T))
+# optimal = gradient_descent(control)
 time_space = np.linspace(0, T, num=Nt, endpoint=True)
-control = np.cos(time_space*np.pi / (2*T))
-control_ref = np.vectorize(u)(time_space)
 
+control_ref = np.vectorize(u)(time_space)
 evolution_ref = solve_forward(control_ref)
 
-# optimal = gradient_descent(control)
-
-# control_plot(control_ref, control, optimal)
+save_as_pvd(evolution_ref, filename='../output/evo.pvd')
