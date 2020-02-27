@@ -17,7 +17,7 @@ set_log_level(40)
 R = 0.0025
 R_laser = 0.0002
 Z = 0.0005
-T, Nt = 0.018, 900
+T, Nt = 0.018, 1800
 dt = T/Nt
 
 # Model constants
@@ -25,9 +25,9 @@ theta_init = Constant("295")
 theta_ext = Constant("295")
 enthalpy = Constant("397000")
 P_YAG = 1600.
-absorb = 0.135
+absorb = 0.1422
 laser_pd = (absorb * P_YAG) / (pi * R_laser**2)
-implicitness = Constant("1.0")
+implicitness = Constant("0.5")
 implicitness_coef = Constant("0.0")
 
 # Optimization parameters
@@ -153,7 +153,7 @@ def s(theta):
 # discete values for lamb(theta) Hermite interpolation spline
 knots_lamb = np.array([273,373,473,573,673,773,858,923])
 values_lamb_rad = np.array([177,182,187,193,198,200,200,400])
-values_lamb_ax = np.array([177,182,187,193,198,200,200,100])
+values_lamb_ax = np.array([177,182,187,193,198,200,200,112])
 
 spline_lamb_rad = spl.gen_hermite_spline(knots_lamb,values_lamb_rad)
 spline_lamb_ax = spl.gen_hermite_spline(knots_lamb,values_lamb_ax)
@@ -187,13 +187,13 @@ def lamb(theta):
 def LaserBC(theta, multiplier):
     return laser_pd * multiplier \
            - 20 * (theta-theta_ext)\
-           - 2.26 * 10**(-9) * (theta**4-theta_ext**4)
+           - 2.27 * 10**(-9) * (theta**4-theta_ext**4)
 
 def EmptyBC(theta):
     return - 20 * (theta-theta_ext)\
-           - 2.26 * 10**(-9) * (theta**4-theta_ext**4)
+           - 2.27 * 10**(-9) * (theta**4-theta_ext**4)
 
-def u(t, t1=0.005, t2=0.010):
+def u(t, t1=0.005, t2=0.005):
     if t < t1:
         return 1.
     elif t < t2:
