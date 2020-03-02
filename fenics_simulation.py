@@ -6,12 +6,16 @@ from matplotlib import pyplot as plt
 from numpy.polynomial import Polynomial
 
 from tqdm import trange
+import argparse
 
 from visualization import control_plot, gradient_test_plot
 import splines as spl
 
 set_log_level(40)
 
+parser = argparse.ArgumentParser()
+parser.add_argument('-o', '--output', default='../output')
+args = parser.parse_args()
 
 # Space and time discretization parameters
 R = 0.0025
@@ -420,19 +424,6 @@ def gradient_test(control, n=10):
     return values_eps, values_delta
 
 
-# control = np.random.rand(Nt)
-# control = np.cos(time_space*np.pi / (2*T))
-# optimal = gradient_descent(control)
-time_space = np.linspace(0, T, num=Nt, endpoint=True)
-
-# control_ref = np.vectorize(u)(time_space)
-# evolution_ref = solve_forward(control_ref)
-
-
-# save_as_pvd(evolution_ref, filename='../output/evo.pvd')
-# save_as_npy(evolution_ref, filename='../output/evo.npy')
-evo = np.load('../output/evo_unirz.npy')
-
 def size_evolution(evo):
     L = len(evo)
     theta = Function(V)
@@ -454,4 +445,11 @@ def size_evolution(evo):
 
     return r_sol, r_liq, d_sol, d_liq
 
-r_sol, r_liq, d_sol, d_liq = size_evolution(evo)
+
+########################################
+
+time_space = np.linspace(0, T, num=Nt, endpoint=True)
+control = np.vectorize(u)(time_space)
+evo = solve_forward(control)
+save_as_npy(evo, args.output+'/evo.npy')
+save_as_pvd(evo, args.output+'/paraview/evo.pvd')
