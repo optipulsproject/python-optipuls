@@ -64,6 +64,9 @@ class EmptyBoundary(SubDomain):
         return on_boundary and \
             ((x[1] > Z-DOLFIN_EPS and x[0] >= R_laser) or x[1] < DOLFIN_EPS)
 
+class SymAxisBoundary(SubDomain):
+    def inside(self, x, on_boundary):
+        return on_boundary and (x[0] < DOLFIN_EPS)
     
 # Create and refine mesh
 mesh = RectangleMesh(Point(0,0),Point(R,Z), 25, 5)
@@ -103,6 +106,9 @@ laser_boundary.mark(boundary_markers, 1)
 
 empty_boundary = EmptyBoundary()
 empty_boundary.mark(boundary_markers, 2)
+
+sym_axis_boundary = SymAxisBoundary()
+sym_axis_boundary.mark(boundary_markers, 3)
 
 ds = Measure('ds', domain=mesh, subdomain_data=boundary_markers)
 
