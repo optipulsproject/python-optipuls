@@ -425,7 +425,33 @@ def gradient_test(control, n=10):
 # optimal = gradient_descent(control)
 time_space = np.linspace(0, T, num=Nt, endpoint=True)
 
-control_ref = np.vectorize(u)(time_space)
-evolution_ref = solve_forward(control_ref)
+# control_ref = np.vectorize(u)(time_space)
+# evolution_ref = solve_forward(control_ref)
 
-save_as_pvd(evolution_ref, filename='../output/evo.pvd')
+
+# save_as_pvd(evolution_ref, filename='../output/evo.pvd')
+# save_as_npy(evolution_ref, filename='../output/evo.npy')
+evo = np.load('../output/evo_unirz.npy')
+
+def size_evolution(evo):
+    L = len(evo)
+    theta = Function(V)
+    r_sol = np.zeros(L)
+    r_liq = np.zeros(L)
+    d_sol = np.zeros(L)
+    d_liq = np.zeros(L)
+
+    for k in trange(L):
+        theta.vector().set_local(evo[k])
+        I_sol = conditional(ge(theta,solidus), 1., 0.)
+        r_sol[k] = assemble(I_sol * (ds(1)+ds(2)))
+        d_sol[k] = assemble(I_sol * ds(3))
+
+        I_liq = conditional(ge(theta,liquidus), 1., 0.)
+        r_liq[k] = assemble(I_liq * (ds(1)+ds(2)))
+        d_liq[k] = assemble(I_liq * ds(3))
+
+
+    return r_sol, r_liq, d_sol, d_liq
+
+r_sol, r_liq, d_sol, d_liq = size_evolution(evo)
