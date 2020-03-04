@@ -215,13 +215,16 @@ def u(t, t1=0.005, t2=0.010):
 def solve_forward(control):
     '''Calculates the solution to the forward problem with the given control.
 
+    For further details, see `indexing diagram`.
+
     Parameters:
         control: ndarray
             The laser power coefficient for every time step. 
 
     Returns:
-        theta_coefficients: ndarray
-            The coefficients of the calculated solution in the basis of space V.
+        evolution: ndarray
+            The coefficients of the calculated solution in the basis of space V
+            at each time step.
             
     '''
 
@@ -310,6 +313,8 @@ def solve_adjoint(evolution, control):
 def Dj(evolution_adj, control):
     '''Calculates the gradient of the cost functional for the given control.
 
+    For further details, see `indexing diagram`.
+
     Parameters:
         evolution_adj: ndarray
             The evolution in time of the adjoint state.
@@ -331,6 +336,7 @@ def Dj(evolution_adj, control):
     Dj = alpha*(control-control_ref) - laser_pd*z
 
     return Dj
+
 
 def gradient_descent(control, iter_max=100, s=512.):
     '''Calculates the optimal control.

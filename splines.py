@@ -46,8 +46,7 @@ def gen_hermite_spline(knots, values, extrapolation='constant'):
         p = p.convert()
         spline[i,:len(p.coef)] = p.coef
 
-    # extrapolation to the right
-    # depends on the preferred extrapolation method
+    # extrapolation to the right depends on the preferred extrapolation method
     if extrapolation=='constant':
         spline[-1] = values[-1], 0, 0, 0
     elif extrapolation=='linear':
