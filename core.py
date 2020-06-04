@@ -353,6 +353,8 @@ def gradient_descent(control, iter_max=100, s=512.):
     cost = J(evolution, control)
     cost_next = cost
 
+    controls_iterations = [control]
+
     print('{:>4} {:>12} {:>14} {:>14}'.format('i', 's', 'j', 'norm'))
 
     for i in range(iter_max):
@@ -379,8 +381,9 @@ def gradient_descent(control, iter_max=100, s=512.):
         control = control_next
         cost = cost_next
         evolution = evolution_next
+        controls_iterations.append(control)
 
-    return control_next
+    return controls_iterations
 
 
 def J(evolution, control):
