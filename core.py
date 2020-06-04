@@ -21,7 +21,7 @@ args = parser.parse_args()
 R = 0.0025
 R_laser = 0.0002
 Z = 0.0005
-T, Nt = 0.018, 900
+T, Nt = 0.015, 600
 dt = T/Nt
 
 # Model constants
@@ -450,12 +450,3 @@ def size_evolution(evo):
 
 
     return r_sol, r_liq, d_sol, d_liq
-
-
-########################################
-
-time_space = np.linspace(0, T, num=Nt, endpoint=True)
-control = np.vectorize(u)(time_space)
-evo = solve_forward(control)
-save_as_npy(evo, args.output+'/evo.npy')
-save_as_pvd(evo, args.output+'/paraview/evo.pvd')
