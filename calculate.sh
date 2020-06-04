@@ -41,4 +41,4 @@ rm -rf "$TARGET_DIR"
 mkdir -p "$TARGET_DIR"
 (cd "$REPO_DIR" && GIT_WORK_TREE="$TARGET_DIR" git checkout -f "$REV" -- .)
 
-(cd "$TARGET_DIR" && python fenics_simulation.py --output="$OUTPUT_DIR")
+(cd "$TARGET_DIR" && python run.py --output="$OUTPUT_DIR")

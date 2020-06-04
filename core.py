@@ -6,16 +6,11 @@ from matplotlib import pyplot as plt
 from numpy.polynomial import Polynomial
 
 from tqdm import trange
-import argparse
 
 from visualization import control_plot, gradient_test_plot
 import splines as spl
 
 set_log_level(40)
-
-parser = argparse.ArgumentParser()
-parser.add_argument('-o', '--output', default='../output')
-args = parser.parse_args()
 
 # Space and time discretization parameters
 R = 0.0025
