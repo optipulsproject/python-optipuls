@@ -16,12 +16,11 @@ set_log_level(40)
 R = 0.0025
 R_laser = 0.0002
 Z = 0.0005
-T, Nt = 0.015, 600
+T, Nt = 0.015, 300
 dt = T/Nt
 
 # Model constants
-theta_init = Constant("295")
-theta_ext = Constant("295")
+theta_amb = Constant("295")
 enthalpy = Constant("397000")
 P_YAG = 1600.
 absorb = 0.135
@@ -191,12 +190,12 @@ def lamb(theta):
 
 def LaserBC(theta, multiplier):
     return laser_pd * multiplier \
-           - 20 * (theta-theta_ext)\
-           - 2.26 * 10**(-9) * (theta**4-theta_ext**4)
+           - 20 * (theta-theta_amb)\
+           - 2.26 * 10**(-9) * (theta**4-theta_amb**4)
 
 def EmptyBC(theta):
-    return - 20 * (theta-theta_ext)\
-           - 2.26 * 10**(-9) * (theta**4-theta_ext**4)
+    return - 20 * (theta-theta_amb)\
+           - 2.26 * 10**(-9) * (theta**4-theta_amb**4)
 
 def u(t, t1=0.005, t2=0.010):
     if t < t1:
@@ -207,7 +206,7 @@ def u(t, t1=0.005, t2=0.010):
         return 0.
  
 
-def solve_forward(control):
+def solve_forward(control, theta_init=project(theta_amb, V)):
     '''Calculates the solution to the forward problem with the given control.
 
     For further details, see `indexing diagram`.
@@ -215,36 +214,40 @@ def solve_forward(control):
     Parameters:
         control: ndarray
             The laser power coefficient for every time step. 
+        theta_init: Function(V)
+            The initial state of the temperature.
 
     Returns:
         evolution: ndarray
-            The coefficients of the calculated solution in the basis of space V
-            at each time step.
+            The coefficients of the calculated solution in the basis of
+            the space V at each time step including the initial state.
             
     '''
 
-    theta_n = Function(V)
-    theta_p = Function(V)
+    theta = Function(V)
+    theta_ = Function(V)
 
-    theta_p = project(theta_init, V)
+    theta.assign(theta_init)
     v = TestFunction(V)
 
+    Nt = len(control)
     evolution = np.zeros((Nt+1,len(V.dofmap().dofs())))
-    evolution[0,:] = theta_p.vector().get_local()
+    evolution[0,:] = theta.vector().get_local()
 
-    theta_m = implicitness*theta_n + (1-implicitness)*theta_p
+    theta_m = implicitness*theta_ + (1-implicitness)*theta
 
     for k in trange(Nt):
-        F = s(theta_p) * (theta_n-theta_p) * v * x[0] * dx \
-          + dt * inner(lamb(theta_p) * grad(theta_m), grad(v)) * x[0] * dx \
+        F = s(theta) * (theta_ - theta) * v * x[0] * dx \
+          + dt * inner(lamb(theta) * grad(theta_m), grad(v)) * x[0] * dx \
           - dt * LaserBC(theta_m, Constant(control[k])) * v * x[0] * ds(1) \
           - dt * EmptyBC(theta_m) * v * x[0] * ds(2)
 
-        solve(F == 0, theta_n)
-        evolution[k+1,:] = theta_n.vector().get_local()
-        theta_p.assign(theta_n)
+        solve(F == 0, theta_)
+        evolution[k+1,:] = theta_.vector().get_local()
+        theta.assign(theta_)
 
     return evolution
+
 
 def save_as_npy(evolution, filename='evolution.npy'):
     np.save(filename, evolution)
