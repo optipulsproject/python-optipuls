@@ -26,25 +26,35 @@ def control_plot(reference, initial, optimal):
     plt.tight_layout()
     plt.show()
 
-def gradient_test_plot(values_eps, values_delta):
+
+def gradient_test_plot(values_eps, *args):
+    '''Makes a plot of gradient_test output.
+
+    Parameters:
+        values_eps: array-like
+            Epsilons used for testing.
+        values_delta: array-like, one or more
+            Delta values to plot. Multiple given arrays provide multiple plots.
+
+    '''
 
     fig, ax = plt.subplots()
+    
+    ax.set_xscale('log')
+    ax.set_yscale('log')
+    
     ax.set_title('Gradient test')
 
-    # x_dots = np.arange(len(reference))
-    # ax.set_xticks(x_dots)
-
-    values_delta = [abs(x) for x in values_delta]
-
-    ax.set_ylim([0,1.1 * max(values_delta)])
-
-    # ax.scatter(values_eps, values_delta, color='red', zorder=2)
-    ax.plot(values_eps, values_delta, color='blue', zorder=1)
+    for values_delta in args:
+        ax.scatter(values_eps, np.abs(values_delta),
+                   label='delta', zorder=2)
+        ax.plot(values_eps, np.abs(values_delta), zorder=1)
 
     ax.legend(loc=2)
 
     plt.tight_layout()
     plt.show()
+
 
 def size_plot(time_space, r_sol, r_liq, d_sol, d_liq, sigma=3, scale=2000):
     dt = time_space[1] - time_space[0]
