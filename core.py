@@ -401,31 +401,71 @@ def J(evolution, control):
 
     return cost
 
-def gradient_test(control, n=10):
-    evolution = solve_forward(control)
-    evolution_adj = solve_adjoint(evolution, control)
+
+def gradient_test(control, n=10, diff_type='forward', eps_init=1.):
+    '''Checks the accuracy of the calculated gradient Dj.
+
+    The scalar product (Dj,direction) is calculated and
+    compared to the finite difference expression for J w.r.t. direction,
+    the absolute error and the relative error are calculated.
+
+    Every iteration epsilon is divided by two.
+
+    Parameters:
+        control: ndarray
+            Control used for testing.
+        n: integer
+            Number of tests.
+        diff_type: 'forward' (default) or 'two_sided'
+            The exact for of the finite difference expression.
+        eps_init: float
+            The initial value of epsilon.
+
+    Returns:
+        epsilons: array-like
+            Epsilons used for testing.
+        deltas: array-like
+            Relative errors.
+
+    '''
+
+    evo = solve_forward(control)
+    evo_adj = solve_adjoint(evo, control)
+    time_space = np.linspace(0, T, num=Nt, endpoint=True) 
     direction = np.cos(time_space*np.pi / (2*T))
     # direction = np.random.rand(Nt)
 
-    D = Dj(evolution_adj, control)
-    print('{:>14} {:>14} {:>14} {:>14}'.\
-        format('epsilon', 'grad', 'derivative', 'delta'))
+    D = Dj(evo_adj, control)
+    print('{:>16}{:>16}{:>16}{:>16}{:>16}'.\
+        format('epsilon', '(Dj,direction)', 'finite diff', 'absolute error',
+               'relative error'))
 
-    values_eps = []
-    values_delta = []
+    epsilons = [eps_init * 2**-k for k in range(n)]
+    deltas = []
 
-    for epsilon in [2**-k for k in range(n)]:
-        scalar_product = dt * np.sum(D*direction)
-        evolution_eps = solve_forward(control + epsilon * direction)
-        derivative = (J(evolution_eps, control + epsilon * direction) -\
-                      J(evolution, control)) / epsilon
-        delta = scalar_product - derivative
-        values_eps.append(epsilon)
-        values_delta.append(delta)
-        print('{:14.7e} {:14.7e} {:14.7e} {:14.7e}'.\
-            format(epsilon, scalar_product, derivative, delta))
+    scalar_product = dt * np.sum(D*direction)
 
-    return values_eps, values_delta
+    for eps in epsilons:
+        
+        if diff_type == 'forward':
+            control_eps = control + eps * direction
+            evo_eps = solve_forward(control_eps)
+            diff = (J(evo_eps, control_eps) - J(evo, control)) / eps
+        elif diff_type == 'two_sided':
+            control_plus_eps = control + eps * direction
+            evo_plus_eps = solve_forward(control_plus_eps)
+            control_minus_eps = control - eps * direction
+            evo_minus_eps = solve_forward(control_minus_eps)
+            diff = (J(evo_plus_eps, control_plus_eps)
+                       - J(evo_minus_eps, control_minus_eps)) / (2 * eps)            
+        
+        delta_abs = scalar_product - diff
+        delta_rel = delta_abs / scalar_product
+        deltas.append(delta_rel)
+        print('{:16.8e}{:16.8e}{:16.8e}{:16.8e}{:16.8e}'.\
+            format(eps, scalar_product, diff, delta_abs, delta_rel))
+
+    return epsilons, deltas
 
 
 def size_evolution(evo):
