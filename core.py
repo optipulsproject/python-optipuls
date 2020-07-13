@@ -54,7 +54,7 @@ class Domain_5(SubDomain):
         return x[0] < 0.2 * R and x[1] > 0.5 * Z
 
 class LaserBoundary(SubDomain):
-    def inside(self, x, on_boundary):            
+    def inside(self, x, on_boundary):
         return on_boundary and x[1] > Z-DOLFIN_EPS and x[0] < R_laser
     
 class EmptyBoundary(SubDomain):
@@ -67,7 +67,7 @@ class SymAxisBoundary(SubDomain):
         return on_boundary and (x[0] < DOLFIN_EPS)
     
 # Create and refine mesh
-mesh = RectangleMesh(Point(0,0),Point(R,Z), 25, 5)
+mesh = RectangleMesh(Point(0,0), Point(R,Z), 25, 5)
 
 domain_2 = Domain_2()
 domain_3 = Domain_3()
@@ -91,8 +91,8 @@ edge_markers = MeshFunction("bool", mesh, mesh.topology().dim()-1)
 domain_5.mark(edge_markers, True)
 mesh = refine(mesh, edge_markers)
 
-x = SpatialCoordinate(mesh)            
-            
+x = SpatialCoordinate(mesh)
+
 # Define function space 
 V = FunctionSpace(mesh, "CG", 1)
 
@@ -208,6 +208,17 @@ def u(t, t1=0.005, t2=0.010):
         return 0.
  
 
+def a(u, u_, v, intensity):
+    u_m = implicitness * u_ + (1-implicitness) * u
+
+    a = s(u) * (u_ - u) * v * x[0] * dx\
+      + dt * inner(lamb(u) * grad(u_m), grad(v)) * x[0] * dx\
+      - dt * laser_bc(intensity) * v * x[0] * ds(1)\
+      - dt * cooling_bc(u_m) * v * x[0] * (ds(1) + ds(2))
+
+    return a
+
+
 def solve_forward(control, theta_init=project(theta_amb, V)):
     '''Calculates the solution to the forward problem with the given control.
 
@@ -228,22 +239,18 @@ def solve_forward(control, theta_init=project(theta_amb, V)):
 
     theta = Function(V)
     theta_ = Function(V)
-
-    theta.assign(theta_init)
     v = TestFunction(V)
 
+    theta.assign(theta_init)
+
     Nt = len(control)
-    evolution = np.zeros((Nt+1,len(V.dofmap().dofs())))
+    evolution = np.zeros((Nt+1, len(V.dofmap().dofs())))
     evolution[0,:] = theta.vector().get_local()
 
     theta_m = implicitness*theta_ + (1-implicitness)*theta
 
     for k in range(Nt):
-        F = s(theta) * (theta_ - theta) * v * x[0] * dx \
-          + dt * inner(lamb(theta) * grad(theta_m), grad(v)) * x[0] * dx \
-          - dt * laser_bc(Constant(control[k])) * v * x[0] * ds(1) \
-          - dt * cooling_bc(theta_m) * v * x[0] * (ds(1) + ds(2))
-
+        F = a(theta, theta_, v, Constant(control[k]))
         solve(F == 0, theta_)
         evolution[k+1,:] = theta_.vector().get_local()
         theta.assign(theta_)
@@ -260,50 +267,43 @@ def save_as_pvd(evolution, filename='evolution.pvd'):
     for k in range(Nt+1):
         theta.vector().set_local(evolution[k])
         theta.rename("theta", "temperature")
-        outfile << theta,k
+        outfile << theta, k
 
 
 def solve_adjoint(evolution, control):
 
     p_prev = TrialFunction(V)
     p_next = Function(V)
-    p_next = project(Constant("0.0"), V)
     p = Function(V)
-    v = TestFunction(V)
-
-    evolution_adj = np.zeros((Nt+1,len(V.dofmap().dofs())))
-    evolution_adj[Nt,:] = p_next.vector().get_local()
-
     theta_next = Function(V)
     theta_prev = Function(V)
     theta_next_ = Function(V)
+    v = TestFunction(V)
 
-    theta_m = implicitness*theta_next + (1-implicitness)*theta_prev
-    theta_m_ = implicitness*theta_next_ + (1-implicitness)*theta_next
+    Nt = len(control)
+    evolution_adj = np.zeros((Nt+1, len(V.dofmap().dofs())))
+    evolution_adj[Nt,:] = p_next.vector().get_local()
 
     # solve backward, i.e. p_next -> p_prev
+    theta_next.vector().set_local(evolution[Nt])
     for k in range(Nt,0,-1):
-        theta_next.vector().set_local(evolution[k])
         theta_prev.vector().set_local(evolution[k-1])
 
-        F = s(theta_prev) * (theta_next - theta_prev) * p_prev * x[0] * dx\
-          + dt * inner(lamb(theta_prev) * grad(theta_m), grad(p_prev)) * x[0] * dx\
-          - dt * laser_bc(Constant(control[k-1])) * p_prev * x[0] * ds(1)\
-          - dt * cooling_bc(theta_m) * p_prev * x[0] * (ds(1) + ds(2))\
+        F = a(theta_prev, theta_next, p_prev, Constant(control[k-1]))\
           + dt * velocity(theta_prev, theta_next)**2 * x[0] * dx
-          
+
         if k < Nt:
             theta_next_.vector().set_local(evolution[k+1])
-            F += s(theta_next) * (theta_next_ - theta_next) * p_next * x[0] * dx\
-               + dt * inner(lamb(theta_next) * grad(theta_m_), grad(p_next)) * x[0] * dx\
-               - dt * laser_bc(Constant(control[k])) * p_next * x[0] * ds(1)\
-               - dt * cooling_bc(theta_m_) * p_next * x[0] * (ds(1) + ds(2))\
+            F += a(theta_next, theta_next_, p_next, Constant(control[k]))\
                + dt * velocity(theta_next,theta_next_)**2 * x[0] * dx
 
         dF = derivative(F,theta_next,v)
         solve(lhs(dF)==rhs(dF),p)
         evolution_adj[k-1,:] = p.vector().get_local()
         p_next.assign(p)
+
+        theta_next_.assign(theta_next)
+        theta_next.assign(theta_prev)
 
     return evolution_adj
 
