@@ -16,7 +16,7 @@ set_log_level(40)
 R = 0.0025
 R_laser = 0.0002
 Z = 0.0005
-T, Nt = 0.015, 300
+T, Nt = 0.015, 30
 dt = T/Nt
 
 # Model constants
@@ -236,7 +236,7 @@ def solve_forward(control, theta_init=project(theta_amb, V)):
 
     theta_m = implicitness*theta_ + (1-implicitness)*theta
 
-    for k in trange(Nt):
+    for k in range(Nt):
         F = s(theta) * (theta_ - theta) * v * x[0] * dx \
           + dt * inner(lamb(theta) * grad(theta_m), grad(v)) * x[0] * dx \
           - dt * LaserBC(theta_m, Constant(control[k])) * v * x[0] * ds(1) \
@@ -471,23 +471,6 @@ def gradient_test(control, n=10, diff_type='forward', eps_init=1.):
     return epsilons, deltas
 
 
-def size_evolution(evo):
-    L = len(evo)
-    theta = Function(V)
-    r_sol = np.zeros(L)
-    r_liq = np.zeros(L)
-    d_sol = np.zeros(L)
-    d_liq = np.zeros(L)
-
-    for k in trange(L):
-        theta.vector().set_local(evo[k])
-        I_sol = conditional(ge(theta,solidus), 1., 0.)
-        r_sol[k] = assemble(I_sol * (ds(1)+ds(2)))
-        d_sol[k] = assemble(I_sol * ds(3))
-
-        I_liq = conditional(ge(theta,liquidus), 1., 0.)
-        r_liq[k] = assemble(I_liq * (ds(1)+ds(2)))
-        d_liq[k] = assemble(I_liq * ds(3))
-
-
-    return r_sol, r_liq, d_sol, d_liq
+time_space = np.linspace(0, T, num=Nt, endpoint=True)
+control_ref = np.vectorize(u)(time_space, t1=0.005, t2=0.010)
+evolution_ref = solve_forward(control_ref)
