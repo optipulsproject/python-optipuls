@@ -271,6 +271,24 @@ def save_as_pvd(evolution, filename='evolution.pvd'):
 
 
 def solve_adjoint(evolution, control):
+    '''Calculates the solution to the adjoint problem with the given evolution
+    (calculated by the forward solver) and the control.
+
+    For further details, see `indexing diagram`.
+
+    Parameters:
+        evolution: ndarray
+            The coefficients of the solution to the corresponding forward
+            problem in the basis of the space V (see solve_forward).
+        control: ndarray
+            The laser power coefficient for every time step. 
+
+    Returns:
+        evolution_adj: ndarray
+            The coefficients of the calculated adjoint solution in the basis of
+            the space V.
+            
+    '''
 
     p_prev = TrialFunction(V)
     p_next = Function(V)
