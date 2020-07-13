@@ -188,14 +188,14 @@ def lamb(theta):
     return as_matrix([[radial, Constant("0.0")],\
                       [Constant("0.0"), axial]])
 
-def LaserBC(theta, multiplier):
-    return laser_pd * multiplier \
-           - 20 * (theta-theta_amb)\
-           - 2.26 * 10**(-9) * (theta**4-theta_amb**4)
+def laser_bc(intensity):
+    return laser_pd * intensity
 
-def EmptyBC(theta):
+
+def cooling_bc(theta):
     return - 20 * (theta-theta_amb)\
            - 2.26 * 10**(-9) * (theta**4-theta_amb**4)
+
 
 def u(t, t1=0.005, t2=0.010):
     if t < t1:
@@ -239,8 +239,8 @@ def solve_forward(control, theta_init=project(theta_amb, V)):
     for k in trange(Nt):
         F = s(theta) * (theta_ - theta) * v * x[0] * dx \
           + dt * inner(lamb(theta) * grad(theta_m), grad(v)) * x[0] * dx \
-          - dt * LaserBC(theta_m, Constant(control[k])) * v * x[0] * ds(1) \
-          - dt * EmptyBC(theta_m) * v * x[0] * ds(2)
+          - dt * laser_bc(Constant(control[k])) * v * x[0] * ds(1) \
+          - dt * cooling_bc(theta_m) * v * x[0] * (ds(1) + ds(2))
 
         solve(F == 0, theta_)
         evolution[k+1,:] = theta_.vector().get_local()
@@ -290,15 +290,15 @@ def solve_adjoint(evolution, control):
         F = Constant("0.5") * dt * (theta_next-theta_ref)**2 * x[0] * dx\
           + s(theta_prev) * (theta_next - theta_prev) * p_prev * x[0] * dx\
           + dt * inner(lamb(theta_prev) * grad(theta_m), grad(p_prev)) * x[0] * dx\
-          - dt * LaserBC(theta_m, Constant(control[k-1])) * p_prev * x[0] * ds(1)\
-          - dt * EmptyBC(theta_m) * p_prev * x[0] * ds(2)
+          - dt * laser_bc(Constant(control[k-1])) * p_prev * x[0] * ds(1)\
+          - dt * cooling_bc(theta_m) * p_prev * x[0] * (ds(1) + ds(2))
           
         if k < Nt:
             theta_next_.vector().set_local(evolution[k+1])
             F += s(theta_next) * (theta_next_ - theta_next) * p_next * x[0] * dx\
                + dt * inner(lamb(theta_next) * grad(theta_m_), grad(p_next)) * x[0] * dx\
-               - dt * LaserBC(theta_m_, Constant(control[k])) * p_next * x[0] * ds(1)\
-               - dt * EmptyBC(theta_m_) * p_next * x[0] * ds(2)
+               - dt * laser_bc(Constant(control[k])) * p_next * x[0] * ds(1)\
+               - dt * cooling_bc(theta_m_) * p_next * x[0] * (ds(1) + ds(2))
 
         dF = derivative(F,theta_next,v)
         solve(lhs(dF)==rhs(dF),p)
