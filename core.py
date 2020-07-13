@@ -5,9 +5,8 @@ import numpy as np
 from matplotlib import pyplot as plt
 from numpy.polynomial import Polynomial
 
-from tqdm import trange
+# from tqdm import trange
 
-from visualization import control_plot, gradient_test_plot
 import splines as spl
 
 set_log_level(40)
@@ -16,7 +15,7 @@ set_log_level(40)
 R = 0.0025
 R_laser = 0.0002
 Z = 0.0005
-T, Nt = 0.015, 300
+T, Nt = 0.015, 30
 dt = T/Nt
 
 # Model constants
@@ -30,6 +29,7 @@ implicitness_coef = Constant("0.0")
 
 # Optimization parameters
 alpha = 0.0001
+beta = 10**6
 iter_max = 5
 tolerance = 10**-18
 
@@ -96,7 +96,6 @@ x = SpatialCoordinate(mesh)
 # Define function space 
 V = FunctionSpace(mesh, "CG", 1)
 
-
 boundary_markers = MeshFunction('size_t', mesh, mesh.topology().dim()-1)
 
 laser_boundary = LaserBoundary()
@@ -151,8 +150,9 @@ def rho(theta):
     
     return result
 
+
 def s(theta):
-    return c(theta)*rho(theta)
+    return c(theta) * rho(theta)
 
 # discete values for lamb(theta) Hermite interpolation spline
 knots_lamb = np.array([273,373,473,573,673,773,858,923])
@@ -161,6 +161,7 @@ values_lamb_ax = np.array([177,182,187,193,198,200,200,100])
 
 spline_lamb_rad = spl.gen_hermite_spline(knots_lamb,values_lamb_rad)
 spline_lamb_ax = spl.gen_hermite_spline(knots_lamb,values_lamb_ax)
+
 
 def lamb(theta):
     radial = 0
@@ -187,6 +188,7 @@ def lamb(theta):
     
     return as_matrix([[radial, Constant("0.0")],\
                       [Constant("0.0"), axial]])
+
 
 def laser_bc(intensity):
     return laser_pd * intensity
@@ -236,7 +238,7 @@ def solve_forward(control, theta_init=project(theta_amb, V)):
 
     theta_m = implicitness*theta_ + (1-implicitness)*theta
 
-    for k in trange(Nt):
+    for k in range(Nt):
         F = s(theta) * (theta_ - theta) * v * x[0] * dx \
           + dt * inner(lamb(theta) * grad(theta_m), grad(v)) * x[0] * dx \
           - dt * laser_bc(Constant(control[k])) * v * x[0] * ds(1) \
@@ -268,7 +270,6 @@ def solve_adjoint(evolution, control):
     p_next = project(Constant("0.0"), V)
     p = Function(V)
     v = TestFunction(V)
-    theta_ref = Function(V)
 
     evolution_adj = np.zeros((Nt+1,len(V.dofmap().dofs())))
     evolution_adj[Nt,:] = p_next.vector().get_local()
@@ -284,21 +285,20 @@ def solve_adjoint(evolution, control):
     for k in range(Nt,0,-1):
         theta_next.vector().set_local(evolution[k])
         theta_prev.vector().set_local(evolution[k-1])
-        theta_ref.vector().set_local(evolution_ref[k])
-        # print('k=',k)
 
-        F = Constant("0.5") * dt * (theta_next-theta_ref)**2 * x[0] * dx\
-          + s(theta_prev) * (theta_next - theta_prev) * p_prev * x[0] * dx\
+        F = s(theta_prev) * (theta_next - theta_prev) * p_prev * x[0] * dx\
           + dt * inner(lamb(theta_prev) * grad(theta_m), grad(p_prev)) * x[0] * dx\
           - dt * laser_bc(Constant(control[k-1])) * p_prev * x[0] * ds(1)\
-          - dt * cooling_bc(theta_m) * p_prev * x[0] * (ds(1) + ds(2))
+          - dt * cooling_bc(theta_m) * p_prev * x[0] * (ds(1) + ds(2))\
+          + dt * velocity(theta_prev, theta_next)**2 * x[0] * dx
           
         if k < Nt:
             theta_next_.vector().set_local(evolution[k+1])
             F += s(theta_next) * (theta_next_ - theta_next) * p_next * x[0] * dx\
                + dt * inner(lamb(theta_next) * grad(theta_m_), grad(p_next)) * x[0] * dx\
                - dt * laser_bc(Constant(control[k])) * p_next * x[0] * ds(1)\
-               - dt * cooling_bc(theta_m_) * p_next * x[0] * (ds(1) + ds(2))
+               - dt * cooling_bc(theta_m_) * p_next * x[0] * (ds(1) + ds(2))\
+               + dt * velocity(theta_next,theta_next_)**2 * x[0] * dx
 
         dF = derivative(F,theta_next,v)
         solve(lhs(dF)==rhs(dF),p)
@@ -331,7 +331,7 @@ def Dj(evolution_adj, control):
         p.vector().set_local(evolution_adj[i])
         z[i] = assemble(p * x[0] * ds(1))
     
-    Dj = alpha*(control-control_ref) - laser_pd*z
+    Dj = - laser_pd*z
 
     return Dj
 
@@ -390,17 +390,17 @@ def gradient_descent(control, iter_max=100, s=512.):
 
 
 def J(evolution, control):
+    '''Calculates the cost functional.'''
+
     cost = 0.
     theta = Function(V)
-    theta_ref = Function(V)
+    theta_ = Function(V)
 
-    for k in range(1,Nt+1):
-        theta.vector().set_local(evolution[k])
-        theta_ref.vector().set_local(evolution_ref[k])
-        cost += .5 * dt *\
-            assemble((theta-theta_ref)**2 * x[0] * dx)
-
-    cost += .5 * dt * alpha * np.sum((control-control_ref)**2)
+    theta.vector().set_local(evolution[0])
+    for k in range(0,Nt):
+        theta_.vector().set_local(evolution[k+1])
+        cost += dt * assemble(velocity(theta,theta_)**2 * x[0] * dx)
+        theta.assign(theta_)
 
     return cost
 
@@ -471,23 +471,15 @@ def gradient_test(control, n=10, diff_type='forward', eps_init=1.):
     return epsilons, deltas
 
 
-def size_evolution(evo):
-    L = len(evo)
-    theta = Function(V)
-    r_sol = np.zeros(L)
-    r_liq = np.zeros(L)
-    d_sol = np.zeros(L)
-    d_liq = np.zeros(L)
+def velocity(theta, theta_):
+    theta_m = implicitness*theta_ + (1-implicitness)*theta
+    grad_norm = sqrt(inner(grad(theta_m), grad(theta_m)))
+    grad_norm2 = inner(grad(theta_m), grad(theta_m))
+    grad_norm3 = inner(grad(theta_m), grad(theta_m))**2
 
-    for k in trange(L):
-        theta.vector().set_local(evo[k])
-        I_sol = conditional(ge(theta,solidus), 1., 0.)
-        r_sol[k] = assemble(I_sol * (ds(1)+ds(2)))
-        d_sol[k] = assemble(I_sol * ds(3))
+    expression = (theta_ - theta) / dt\
+        / grad_norm\
+        * conditional(ge(grad_norm,DOLFIN_EPS),1.,0.)\
+        * conditional(ufl.And(ge(theta_m,solidus),lt(theta_m,liquidus)),1.,0.)\
 
-        I_liq = conditional(ge(theta,liquidus), 1., 0.)
-        r_liq[k] = assemble(I_liq * (ds(1)+ds(2)))
-        d_liq[k] = assemble(I_liq * ds(3))
-
-
-    return r_sol, r_liq, d_sol, d_liq
+    return beta * expression
