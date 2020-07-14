@@ -1,6 +1,7 @@
 import numpy as np
 from numpy.polynomial import Polynomial
-
+from ufl import *
+from dolfin import *
 # from matplotlib import pyplot as plt
 
 # Hermitian cubic interpolation polynomials
@@ -27,14 +28,13 @@ def gen_hermite_spline(knots, values, extrapolation='constant'):
 
     '''
 
-    # temporary solution
-    # derivatives = np.gradient(values,knots)
+    # must be changed to monotone spline interpolation in the future
     derivatives = np.gradient(values)
 
     left = np.outer(values[:-1],p0) + np.outer(derivatives[:-1],m0)
     right = np.outer(values[1:],p1) + np.outer(derivatives[1:],m1)
 
-    spline = np.zeros((len(knots),4), float)
+    spline = np.zeros((len(knots),4), dtype=float)
 
     spline[:-1] = left + right
 
@@ -54,3 +54,21 @@ def gen_hermite_spline(knots, values, extrapolation='constant'):
         spline[-1] = values[-1], k, 0, 0
 
     return spline
+
+
+def spline_as_ufl(spline, knots):
+    def ufl_spline(t):
+        expression = 0
+
+        for i in range(len(spline)-1):
+            x_p = Constant(knots[i])
+            x_n = Constant(knots[i+1])
+            expression += conditional(And(ge(t,x_p),lt(t,x_n)), 1., 0.)\
+                        * Polynomial(spline[i])(t)
+
+        expression += conditional(ge(t,Constant(knots[-1])), 1., 0.)\
+                    * Polynomial(spline[-1])(t)
+
+        return expression
+
+    return ufl_spline

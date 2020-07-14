@@ -4,6 +4,7 @@ import ufl
 import numpy as np
 from matplotlib import pyplot as plt
 from numpy.polynomial import Polynomial
+import json
 
 # from tqdm import trange
 
@@ -110,84 +111,39 @@ sym_axis_boundary.mark(boundary_markers, 3)
 ds = Measure('ds', domain=mesh, subdomain_data=boundary_markers)
 
 
-# discete values for c(theta) Hermite interpolation spline
-knots_c = np.array([273,373,473,573,673,773,858,890,923,973,1073])
-values_c = np.array([896,925,958,990,1016,1040,1058,11000,1070,1070,1070])
+with open('material.json') as file:
+    material = json.load(file)
 
-spline_c = spl.gen_hermite_spline(knots_c,values_c)
+spline = spl.gen_hermite_spline(
+    material['heat capacity']['knots'],
+    material['heat capacity']['values'])
+c = spl.spline_as_ufl(spline, material['heat capacity']['knots'])
 
-def c(theta):
-    result = 0
+spline = spl.gen_hermite_spline(
+    material['density']['knots'],
+    material['density']['values'],
+    extrapolation='linear')
+rho = spl.spline_as_ufl(spline, material['density']['knots'])
 
-    for i in range(len(spline_c)-1):
-        x_p = Constant(knots_c[i])
-        x_n = Constant(knots_c[i+1])
-        result += conditional(ufl.And(ge(theta,x_p),lt(theta,x_n)), 1., 0.)\
-                    * Polynomial(spline_c[i])(theta)
+spline = spl.gen_hermite_spline(
+    material['thermal conductivity']['radial']['knots'],
+    material['thermal conductivity']['radial']['values'])
+kappa_rad = spl.spline_as_ufl(spline,
+                material['thermal conductivity']['radial']['knots'])
 
-    result += conditional(ge(theta,Constant(knots_c[-1])), 1., 0.)\
-                * Polynomial(spline_c[-1])(theta)
-    
-    return result
+spline = spl.gen_hermite_spline(
+    material['thermal conductivity']['axial']['knots'],
+    material['thermal conductivity']['axial']['values'])
+kappa_ax = spl.spline_as_ufl(spline,
+                material['thermal conductivity']['axial']['knots'])
 
-knots_rho = np.array([273,373,473,573,673,773,858,923,973,1073,1173])
-values_rho = np.array([2750,2730,2710,2690,2670,2650,2630,2450,2440,2430,2420])
-
-spline_rho = spl.gen_hermite_spline(\
-                knots_rho, values_rho, extrapolation='linear')
-
-def rho(theta):
-    result = 0
-
-    for i in range(len(spline_rho)-1):
-        x_p = Constant(knots_rho[i])
-        x_n = Constant(knots_rho[i+1])
-        result += conditional(ufl.And(ge(theta,x_p),lt(theta,x_n)), 1., 0.)\
-                    * Polynomial(spline_rho[i])(theta)
-
-    result += conditional(ge(theta,Constant(knots_rho[-1])), 1., 0.)\
-                * Polynomial(spline_rho[-1])(theta)
-    
-    return result
+def kappa(theta):
+    return as_matrix([[kappa_rad(theta), Constant("0.0")],
+                      [Constant("0.0"), kappa_ax(theta)]])
 
 
 def s(theta):
     return c(theta) * rho(theta)
-
-# discete values for lamb(theta) Hermite interpolation spline
-knots_lamb = np.array([273,373,473,573,673,773,858,923])
-values_lamb_rad = np.array([177,182,187,193,198,200,200,400])
-values_lamb_ax = np.array([177,182,187,193,198,200,200,100])
-
-spline_lamb_rad = spl.gen_hermite_spline(knots_lamb,values_lamb_rad)
-spline_lamb_ax = spl.gen_hermite_spline(knots_lamb,values_lamb_ax)
-
-
-def lamb(theta):
-    radial = 0
-
-    for i in range(len(spline_lamb_rad)-1):
-        x_p = Constant(knots_lamb[i])
-        x_n = Constant(knots_lamb[i+1])
-        radial += conditional(ufl.And(ge(theta,x_p),lt(theta,x_n)), 1., 0.)\
-                    * Polynomial(spline_lamb_rad[i])(theta)
-
-    radial += conditional(ge(theta,Constant(knots_lamb[-1])), 1., 0.)\
-                * Polynomial(spline_lamb_rad[-1])(theta)
-
-    axial = 0
-
-    for i in range(len(spline_lamb_ax)-1):
-        x_p = Constant(knots_lamb[i])
-        x_n = Constant(knots_lamb[i+1])
-        axial += conditional(ufl.And(ge(theta,x_p),lt(theta,x_n)), 1., 0.)\
-                    * Polynomial(spline_lamb_ax[i])(theta)
-
-    axial += conditional(ge(theta,Constant(knots_lamb[-1])), 1., 0.)\
-                * Polynomial(spline_lamb_ax[-1])(theta)
-    
-    return as_matrix([[radial, Constant("0.0")],\
-                      [Constant("0.0"), axial]])
 
 
 def laser_bc(intensity):
@@ -209,10 +165,11 @@ def u(t, t1=0.005, t2=0.010):
  
 
 def a(u, u_, v, intensity):
+
     u_m = implicitness * u_ + (1-implicitness) * u
 
     a = s(u) * (u_ - u) * v * x[0] * dx\
-      + dt * inner(lamb(u) * grad(u_m), grad(v)) * x[0] * dx\
+      + dt * inner(kappa(u) * grad(u_m), grad(v)) * x[0] * dx\
       - dt * laser_bc(intensity) * v * x[0] * ds(1)\
       - dt * cooling_bc(u_m) * v * x[0] * (ds(1) + ds(2))
 
