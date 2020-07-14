@@ -27,14 +27,21 @@ def control_plot(reference, initial, optimal):
     plt.show()
 
 
-def gradient_test_plot(values_eps, *args):
+def gradient_test_plot(eps, *deltas, **kwargs):
     '''Makes a plot of gradient_test output.
 
     Parameters:
-        values_eps: array-like
+        epsilon: array-like
             Epsilons used for testing.
-        values_delta: array-like, one or more
-            Delta values to plot. Multiple given arrays provide multiple plots.
+        delta: array-like, one or more
+            Delta values to plot. Multiple given arrays provide multiple curves.
+        labels: list of strings
+            Labels for the given deltas.
+
+    Usage:
+        gradient_test_plot(eps, delta)
+        gradient_test_plot(eps, delta_1, delta_2)
+        gradient_test_plot(eps, delta_1, delta_2, labels=['label 1', 'label 2'])
 
     '''
 
@@ -45,10 +52,14 @@ def gradient_test_plot(values_eps, *args):
     
     ax.set_title('Gradient test')
 
-    for values_delta in args:
-        ax.scatter(values_eps, np.abs(values_delta),
-                   label='delta', zorder=2)
-        ax.plot(values_eps, np.abs(values_delta), zorder=1)
+    if 'labels' in kwargs:
+        labels = kwargs['labels']
+    else:
+        labels = ['delta ' + str(i+1) for i in range(len(args))]
+
+    for delta, label in zip(deltas, labels):
+        ax.scatter(epsilon, np.abs(deltas), label=label, zorder=2)
+        ax.plot(epsilon, np.abs(deltas), zorder=1)
 
     ax.legend(loc=2)
 
