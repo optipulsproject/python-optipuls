@@ -27,25 +27,29 @@ def control_plot(reference, initial, optimal):
     plt.show()
 
 
-def gradient_test_plot(eps, *deltas, **kwargs):
+def gradient_test_plot(eps, *deltas, outfile=None, **kwargs):
     '''Makes a plot of gradient_test output.
 
     Parameters:
-        epsilon: array-like
+        eps: array-like
             Epsilons used for testing.
-        delta: array-like, one or more
+        deltas: array-like, one or more
             Delta values to plot. Multiple given arrays provide multiple curves.
         labels: list of strings
             Labels for the given deltas.
+        kwargs:
+            Additional parameters for pyplot.show or pyplot.savefig.
 
     Usage:
         gradient_test_plot(eps, delta)
+        gradient_test_plot(eps, delta, outfile='filename.png', dpi=160)
         gradient_test_plot(eps, delta_1, delta_2)
         gradient_test_plot(eps, delta_1, delta_2, labels=['label 1', 'label 2'])
 
     '''
 
     fig, ax = plt.subplots()
+    fig.set_size_inches(8,6)
     
     ax.set_xscale('log')
     ax.set_yscale('log')
@@ -55,16 +59,19 @@ def gradient_test_plot(eps, *deltas, **kwargs):
     if 'labels' in kwargs:
         labels = kwargs['labels']
     else:
-        labels = ['delta ' + str(i+1) for i in range(len(args))]
+        labels = ['delta ' + str(i+1) for i in range(len(deltas))]
 
     for delta, label in zip(deltas, labels):
-        ax.scatter(epsilon, np.abs(deltas), label=label, zorder=2)
-        ax.plot(epsilon, np.abs(deltas), zorder=1)
+        ax.scatter(eps, np.abs(delta), label=label, zorder=2)
+        ax.plot(eps, np.abs(delta), zorder=1)
 
     ax.legend(loc=2)
 
     plt.tight_layout()
-    plt.show()
+    if not outfile:
+        plt.show(**kwargs)
+    else:
+        plt.savefig(outfile, **kwargs)
 
 
 def size_plot(time_space, r_sol, r_liq, d_sol, d_liq, sigma=3, scale=2000):
