@@ -27,7 +27,7 @@ def control_plot(reference, initial, optimal):
     plt.show()
 
 
-def gradient_test_plot(eps, *deltas, outfile=None, **kwargs):
+def gradient_test_plot(eps, *deltas, labels=None, outfile=None, **kwargs):
     '''Makes a plot of gradient_test output.
 
     Parameters:
@@ -56,9 +56,7 @@ def gradient_test_plot(eps, *deltas, outfile=None, **kwargs):
     
     ax.set_title('Gradient test')
 
-    if 'labels' in kwargs:
-        labels = kwargs['labels']
-    else:
+    if not labels:
         labels = ['delta ' + str(i+1) for i in range(len(deltas))]
 
     for delta, label in zip(deltas, labels):
