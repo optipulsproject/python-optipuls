@@ -137,6 +137,7 @@ spline = spl.gen_hermite_spline(
 kappa_ax = spl.spline_as_ufl(spline,
                 material['thermal conductivity']['axial']['knots'])
 
+
 def kappa(theta):
     return as_matrix([[kappa_rad(theta), Constant("0.0")],
                       [Constant("0.0"), kappa_ax(theta)]])
@@ -203,8 +204,6 @@ def solve_forward(control, theta_init=project(theta_amb, V)):
     Nt = len(control)
     evolution = np.zeros((Nt+1, len(V.dofmap().dofs())))
     evolution[0,:] = theta.vector().get_local()
-
-    theta_m = implicitness*theta_ + (1-implicitness)*theta
 
     for k in range(Nt):
         F = a(theta, theta_, v, Constant(control[k]))
