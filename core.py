@@ -11,6 +11,7 @@ import json
 import splines as spl
 
 set_log_level(40)
+parameters["form_compiler"]["quadrature_degree"] = 1
 
 # Space and time discretization parameters
 R = 0.0025
