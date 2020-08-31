@@ -17,7 +17,7 @@ parameters["form_compiler"]["quadrature_degree"] = 1
 R = 0.0025
 R_laser = 0.0002
 Z = 0.0005
-T, Nt = 0.015, 30
+T, Nt = 0.010, 100
 dt = T/Nt
 
 # Model constants
@@ -27,13 +27,14 @@ P_YAG = 1600.
 absorb = 0.135
 laser_pd = (absorb * P_YAG) / (pi * R_laser**2)
 implicitness = Constant("1.0")
-implicitness_coef = Constant("0.0")
 
 # Optimization parameters
-alpha = 0.0001
-beta = 10**6
+alpha = 0.
+beta = 10**18
+gamma = 10**8
 iter_max = 5
 tolerance = 10**-18
+velocity_max = 0.12
 
 # Aggregate state
 liquidus = 923.0
@@ -97,6 +98,7 @@ x = SpatialCoordinate(mesh)
 
 # Define function space 
 V = FunctionSpace(mesh, "CG", 1)
+V1 = FunctionSpace(mesh, "DG", 0)
 
 boundary_markers = MeshFunction('size_t', mesh, mesh.topology().dim()-1)
 
@@ -265,12 +267,12 @@ def solve_adjoint(evolution, control):
         theta_prev.vector().set_local(evolution[k-1])
 
         F = a(theta_prev, theta_next, p_prev, Constant(control[k-1]))\
-          + dt * velocity(theta_prev, theta_next)**2 * x[0] * dx
+          + dt * J_expression(theta_prev, theta_next, coefficients, expressions)
 
         if k < Nt:
             theta_next_.vector().set_local(evolution[k+1])
             F += a(theta_next, theta_next_, p_next, Constant(control[k]))\
-               + dt * velocity(theta_next,theta_next_)**2 * x[0] * dx
+               + dt * J_expression(theta_next, theta_next_, coefficients, expressions)
 
         dF = derivative(F,theta_next,v)
         solve(lhs(dF)==rhs(dF),p)
@@ -306,12 +308,13 @@ def Dj(evolution_adj, control):
         p.vector().set_local(evolution_adj[i])
         z[i] = assemble(p * x[0] * ds(1))
     
+    # Dj = alpha * control**2 - laser_pd*z
     Dj = - laser_pd*z
 
     return Dj
 
 
-def gradient_descent(control, iter_max=100, s=512.):
+def gradient_descent(control, init, iter_max=100, s=512.):
     '''Calculates the optimal control.
 
     Parameters:
@@ -325,59 +328,74 @@ def gradient_descent(control, iter_max=100, s=512.):
 
     '''
 
-    # TODO: change the breaking condition
+    try:
+        # TODO: change the breaking condition
 
-    evolution = solve_forward(control)
-    cost = J(evolution, control)
-    cost_next = cost
+        evolution = solve_forward(control, init)
+        cost = J(evolution, control)
+        cost_next = cost
 
-    controls_iterations = [control]
-
-    print('{:>4} {:>12} {:>14} {:>14}'.format('i', 's', 'j', 'norm'))
-
-    for i in range(iter_max):
-        
-        evolution_adj = solve_adjoint(evolution, control)
-        D = Dj(evolution_adj, control)
-        norm = dt * np.sum(D**2)
-        
-        if norm < tolerance:
-            print('norm < tolerance')
-            break
-
-        first_try = True
-        while (cost_next >= cost) or first_try:
-            control_next = np.clip(control - s*D, 0, 1)
-            evolution_next = solve_forward(control_next)
-            cost_next = J(evolution_next, control_next)
-            print('{:4} {:12.6f} {:14.7e} {:14.7e}'.\
-                format(i, s, cost_next, norm))
-            if not first_try: s /= 2
-            first_try = False
-
-        s *= 2
-        control = control_next
-        cost = cost_next
-        evolution = evolution_next
+        controls_iterations = []
         controls_iterations.append(control)
+
+        print('{:>4} {:>12} {:>14} {:>14}'.format('i', 's', 'j', 'norm'))
+
+        for i in range(iter_max):
+            
+            evolution_adj = solve_adjoint(evolution, control)
+            D = Dj(evolution_adj, control)
+            norm = dt * np.sum(D**2)
+            
+            if norm < tolerance:
+                print('norm = {} < tolerance'.format(norm))
+                break
+
+            first_try = True
+            while (cost_next >= cost) or first_try:
+                control_next = np.clip(control - s*D, 0, 1)
+                evolution_next = solve_forward(control_next, init)
+                cost_next = J(evolution_next, control)
+                print('{:4} {:12.6f} {:14.7e} {:14.7e}'.\
+                    format(i, s, cost_next, norm))
+                if not first_try: s /= 2
+                first_try = False
+
+            s *= 2
+            control = control_next
+            cost = cost_next
+            evolution = evolution_next
+            controls_iterations.append(control)
+
+    except KeyboardInterrupt:
+        print('Interrupted by user...')
 
     return controls_iterations
 
 
-def J(evolution, control):
-    '''Calculates the cost functional.'''
+# def J(evolution, control, as_vector=False, **kwargs):
+#     '''Calculates the cost functional.'''
 
-    cost = 0.
-    theta = Function(V)
-    theta_ = Function(V)
+#     # cost = 0.
+#     theta = Function(V)
+#     theta_ = Function(V)
 
-    theta.vector().set_local(evolution[0])
-    for k in range(0,Nt):
-        theta_.vector().set_local(evolution[k+1])
-        cost += dt * assemble(velocity(theta,theta_)**2 * x[0] * dx)
-        theta.assign(theta_)
+#     vector = np.zeros(Nt)
 
-    return cost
+#     theta.vector().set_local(evolution[0])
+#     for k in range(Nt):
+#         theta_.vector().set_local(evolution[k+1])
+#         # value = dt * assemble(velocity(theta, theta_)**2 * x[0] * dx)
+#         # cost += value
+#         vector[k] += dt * assemble(velocity(theta, theta_)**2 * x[0] * dx)
+#         vector[k] += dt * assemble(liquidity(theta, theta_)**2 * x[0] * dx)
+#         theta.assign(theta_)
+
+#     # vector += 0.5 * alpha * control**2
+
+#     if as_vector:
+#         return vector
+#     else:
+#         return np.sum(vector)
 
 
 def gradient_test(control, n=10, diff_type='forward', eps_init=1.):
@@ -446,15 +464,84 @@ def gradient_test(control, n=10, diff_type='forward', eps_init=1.):
     return epsilons, deltas
 
 
-def velocity(theta, theta_):
+def velocity(theta, theta_, velocity_max=velocity_max):
     theta_m = implicitness*theta_ + (1-implicitness)*theta
     grad_norm = sqrt(inner(grad(theta_m), grad(theta_m)))
-    grad_norm2 = inner(grad(theta_m), grad(theta_m))
-    grad_norm3 = inner(grad(theta_m), grad(theta_m))**2
 
-    expression = (theta_ - theta) / dt\
+    velocity_ = (theta_ - theta) / dt\
         / grad_norm\
-        * conditional(ge(grad_norm,DOLFIN_EPS),1.,0.)\
-        * conditional(ufl.And(ge(theta_m,solidus),lt(theta_m,liquidus)),1.,0.)\
+        * conditional(ge(grad_norm, DOLFIN_EPS), 1., 0.)\
+        * conditional(ufl.And(ge(theta,solidus), lt(theta_,liquidus)), 1., 0.)
+    
+    velocity_ *= conditional(le(velocity_, 0.), 1., 0.)
+    velocity_ *= conditional(ge(-velocity_, velocity_max), 1., 0.)
+    velocity_ *= -1
 
-    return beta * expression
+    return velocity_
+
+
+def liquidity(theta, theta_):
+    theta_m = implicitness*theta_ + (1-implicitness)*theta
+
+    liquidity_ = theta_m - Constant(solidus)
+    liquidity_ *= conditional(ge(liquidity_, 0.), 1., 0.)
+
+    return liquidity_
+
+
+def completenes(theta, theta_):
+    pass
+
+
+expressions = [velocity, liquidity]
+# expressions = [velocity]
+coefficients = [beta, gamma]
+# coefficients = [beta]
+
+def J_expression(theta, theta_, coefficients, expressions):
+    '''Combines multiple penalty terms into single UFL expression.
+
+    The penalty terms are supposed to be control independent.
+    Control effort is not penalized here!
+
+    Usage:
+    J_expression(theta, theta_, [beta, gamma], [velocity, liquidity])
+    J_expression(theta, theta_, coefficients, expressions)
+
+    '''
+
+    return sum(c * e(theta, theta_)**2 * x[0] * dx
+        for c, e in zip(coefficients, expressions))
+
+
+def J_vector(evolution, control, coefficients, expressions):
+    '''WARNING: control cost is presented here!'''
+
+    theta = Function(V)
+    theta_ = Function(V)
+
+    Nt = len(evolution) - 1
+    J_vector_ = np.zeros(Nt)
+
+    theta.vector().set_local(evolution[0])
+    for k in range(Nt):
+        theta_.vector().set_local(evolution[k+1])
+        e = J_expression(theta, theta_, coefficients, expressions)
+        J_vector_[k] = assemble(e)
+        theta.assign(theta_)
+
+    J_vector_ += alpha * control**2
+
+    return J_vector_
+
+
+def J_total(evolution, control,
+            coefficients=coefficients,
+            expressions=expressions):
+
+    J_vector_ = J_vector(evolution, control, coefficients, expressions)
+    return dt * J_vector_.sum()
+
+
+# testing gradient_descent with J_expression
+J = J_total
