@@ -7,7 +7,7 @@ from matplotlib import pyplot as plt
 def control_plot(*controls, labels=None, outfile=None, **kwargs):
 
     fig, ax = plt.subplots()
-    fig.set_size_inches(8,6)
+    fig.set_size_inches(12,8)
 
     ax.set_title('Control')
 
@@ -37,7 +37,7 @@ def control_plot(*controls, labels=None, outfile=None, **kwargs):
 def objective_plot(*objectives, labels=None, outfile=None, **kwargs):
 
     fig, ax = plt.subplots()
-    fig.set_size_inches(8,6)
+    fig.set_size_inches(12,8)
 
     ax.set_title('Objective in time')
 
@@ -81,7 +81,7 @@ def gradient_test_plot(eps, *deltas, labels=None, outfile=None, **kwargs):
     '''
 
     fig, ax = plt.subplots()
-    fig.set_size_inches(8,6)
+    fig.set_size_inches(12,8)
     
     ax.set_xscale('log')
     ax.set_yscale('log')
