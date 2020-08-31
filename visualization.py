@@ -4,27 +4,59 @@ from matplotlib import pyplot as plt
 # from matplotlib import colors
 
 
-def control_plot(reference, initial, optimal):
+def control_plot(*controls, labels=None, outfile=None, **kwargs):
 
     fig, ax = plt.subplots()
-    ax.set_title('Control optimization')
+    fig.set_size_inches(8,6)
 
-    x_dots = np.arange(len(reference))
-    ax.set_xticks(x_dots)
+    ax.set_title('Control')
 
-    ax.scatter(x_dots, reference, color='purple', zorder=1, label='Reference control')
-    ax.plot(reference, color='purple', zorder=1)
-    ax.scatter(x_dots, initial, color='gray', zorder=2, alpha=0.5, label='Initial guess')
-    ax.plot(initial, color='gray', zorder=2, alpha=0.5)
-    ax.scatter(x_dots, optimal, color='blue', zorder=3, label='Optimized')
-    ax.plot(optimal, color='blue', zorder=3)
+    x = np.arange(len(controls[0]))
+    # ax.set_xticks(x)
 
-    ax.fill_between(x_dots, optimal, reference, alpha=0.2, color='blue')
+    if not labels:
+        labels = ['control ' + str(i+1) for i in range(len(controls))]
+
+    for control, label in zip(controls, labels):
+        # ax.scatter(x, objective, label=label, zorder=2)
+        ax.scatter(x, control, color='purple', zorder=0, label=label)
+        ax.plot(x, control, color='purple', zorder=1)
+
+    ax.fill_between(x, controls[0], controls[-1], alpha=0.2, color='blue')
 
     ax.legend(loc=2)
 
     plt.tight_layout()
-    plt.show()
+    if not outfile:
+        plt.show(**kwargs)
+    else:
+        plt.savefig(outfile, **kwargs)
+
+
+
+def objective_plot(*objectives, labels=None, outfile=None, **kwargs):
+
+    fig, ax = plt.subplots()
+    fig.set_size_inches(8,6)
+
+    ax.set_title('Objective in time')
+
+    x = np.arange(len(objectives[0]))
+
+    if not labels:
+        labels = ['objective ' + str(i+1) for i in range(len(objectives))]
+
+    for objective, label in zip(objectives, labels):
+        # ax.scatter(x, objective, label=label, zorder=2)
+        ax.bar(x, objective, label=label, alpha=0.3)
+
+    ax.legend(loc=2)
+
+    plt.tight_layout()
+    if not outfile:
+        plt.show(**kwargs)
+    else:
+        plt.savefig(outfile, **kwargs)
 
 
 def gradient_test_plot(eps, *deltas, labels=None, outfile=None, **kwargs):
