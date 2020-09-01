@@ -230,10 +230,14 @@ def save_as_pvd(evolution, filename='evolution.pvd'):
 
 
 def solve_adjoint(evolution, control):
-    '''Calculates the solution to the adjoint problem with the given evolution
-    (calculated by the forward solver) and the control.
+    '''Calculates the solution to the adjoint problem.
 
-    For further details, see `indexing diagram`.
+    The solution to the adjoint equation is calculated using the explicitly
+    given evolution (solution to the forward problem) and control.
+    The objective function is provided implicitly and represented in the code
+    by J_expression.
+
+    For better understanding of the indeces see docs/indexing-diagram.txt.
 
     Parameters:
         evolution: ndarray
@@ -270,9 +274,11 @@ def solve_adjoint(evolution, control):
           + dt * J_expression(theta_prev, theta_next, coefficients, expressions)
 
         if k < Nt:
+            # is it correct that the next line can be omitted?
             theta_next_.vector().set_local(evolution[k+1])
             F += a(theta_next, theta_next_, p_next, Constant(control[k]))\
-               + dt * J_expression(theta_next, theta_next_, coefficients, expressions)
+               + dt * J_expression(theta_next, theta_next_,
+                                   coefficients, expressions)
 
         dF = derivative(F,theta_next,v)
         solve(lhs(dF)==rhs(dF),p)
