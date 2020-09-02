@@ -29,9 +29,9 @@ laser_pd = (absorb * P_YAG) / (pi * R_laser**2)
 implicitness = Constant("1.0")
 
 # Optimization parameters
-alpha = 0.
-beta = 10**18
-gamma = 10**8
+alpha = 0. # temporarily exclude the control cost
+beta = 10**12
+gamma = 10**1
 iter_max = 5
 tolerance = 10**-18
 velocity_max = 0.12
@@ -314,8 +314,7 @@ def Dj(evolution_adj, control):
         p.vector().set_local(evolution_adj[i])
         z[i] = assemble(p * x[0] * ds(1))
     
-    # Dj = alpha * control**2 - laser_pd*z
-    Dj = - laser_pd*z
+    Dj = alpha * control - laser_pd*z
 
     return Dj
 
@@ -500,9 +499,7 @@ def completenes(theta, theta_):
 
 
 expressions = [velocity, liquidity]
-# expressions = [velocity]
 coefficients = [beta, gamma]
-# coefficients = [beta]
 
 def J_expression(theta, theta_, coefficients, expressions):
     '''Combines multiple penalty terms into single UFL expression.
@@ -536,7 +533,7 @@ def J_vector(evolution, control, coefficients, expressions):
         J_vector_[k] = assemble(e)
         theta.assign(theta_)
 
-    J_vector_ += alpha * control**2
+    J_vector_ += .5 * alpha * control**2
 
     return J_vector_
 
