@@ -380,7 +380,7 @@ def J(evolution, control):
     return cost
 
 
-def gradient_test(control, n=10, diff_type='forward', eps_init=1.):
+def gradient_test(control, n=15, diff_type='forward', eps_init=.1):
     '''Checks the accuracy of the calculated gradient Dj.
 
     The scalar product (Dj,direction) is calculated and
@@ -410,8 +410,11 @@ def gradient_test(control, n=10, diff_type='forward', eps_init=1.):
     evo = solve_forward(control)
     evo_adj = solve_adjoint(evo, control)
     time_space = np.linspace(0, T, num=Nt, endpoint=True) 
-    direction = np.cos(time_space*np.pi / (2*T))
-    # direction = np.random.rand(Nt)
+    direction = np.random.rand(Nt)
+    norm = np.sqrt(dt * np.sum(direction**2))
+    direction /= norm
+    direction *= .0005 * T
+
 
     D = Dj(evo_adj, control)
     print('{:>16}{:>16}{:>16}{:>16}{:>16}'.\

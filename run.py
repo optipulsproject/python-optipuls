@@ -10,9 +10,7 @@ args = parser.parse_args()
 
 time_space = np.linspace(0, T, num=Nt, endpoint=True)
 
-control = np.vectorize(u)(time_space, t1=0.005, t2=0.010)
-
-epsilons, deltas_fwd = gradient_test(
-    control, n=15, diff_type='forward', eps_init=2**-10)
+control = .25 * np.sin(time_space*np.pi / (2*T)) + .5
+epsilons, deltas_fwd = gradient_test(control, n=15)
 gradient_test_plot(epsilons, deltas_fwd)
 
