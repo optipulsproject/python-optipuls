@@ -30,10 +30,12 @@ implicitness = Constant("1.0")
 implicitness_coef = Constant("0.0")
 
 # Optimization parameters
-alpha = 0.0001
+alpha = 0.
 beta = 10**6
 iter_max = 5
 tolerance = 10**-18
+
+control_ref = np.zeros(Nt)
 
 # Aggregate state
 liquidus = 923.0
@@ -306,7 +308,7 @@ def Dj(evolution_adj, control):
         p.vector().set_local(evolution_adj[i])
         z[i] = assemble(p * x[0] * ds(1))
     
-    Dj = - laser_pd*z
+    Dj = alpha * (control-control_ref) - laser_pd*z
 
     return Dj
 
@@ -376,6 +378,8 @@ def J(evolution, control):
         theta_.vector().set_local(evolution[k+1])
         cost += dt * assemble(velocity(theta,theta_)**2 * x[0] * dx)
         theta.assign(theta_)
+
+    cost += .5 * alpha * dt * np.sum((control-control_ref)**2)
 
     return cost
 
