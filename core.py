@@ -451,13 +451,12 @@ def gradient_test(control, n=15, diff_type='forward', eps_init=.1):
 
 def velocity(theta, theta_):
     theta_m = implicitness*theta_ + (1-implicitness)*theta
-    grad_norm = sqrt(inner(grad(theta_m), grad(theta_m)))
+    grad_norm = sqrt(inner(grad(theta_m), grad(theta_m)) + DOLFIN_EPS)
     grad_norm2 = inner(grad(theta_m), grad(theta_m))
     grad_norm3 = inner(grad(theta_m), grad(theta_m))**2
 
     expression = (theta_ - theta) / dt\
         / grad_norm\
-        * conditional(ge(grad_norm,DOLFIN_EPS),1.,0.)\
-        * conditional(ufl.And(ge(theta_m,solidus),lt(theta_m,liquidus)),1.,0.)\
+        * conditional(ufl.And(ge(theta,solidus), lt(theta_,liquidus)), 1., 0.)
 
     return beta * expression
