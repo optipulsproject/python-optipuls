@@ -13,9 +13,9 @@ args = parser.parse_args()
 # save_as_npy(evo[-1], args.scratch+'/theta_hot.npy')
 
 # load the saved state
-theta_hot_np = np.load(args.scratch+'/theta_hot.npy')
-theta_hot = Function(V)
-theta_hot.vector().set_local(theta_hot_np)
+# theta_hot_np = np.load(args.scratch+'/theta_hot.npy')
+# theta_hot = Function(V)
+# theta_hot.vector().set_local(theta_hot_np)
 
 
 time_space = np.linspace(0, T, num=Nt, endpoint=True)

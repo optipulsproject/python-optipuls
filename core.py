@@ -17,7 +17,7 @@ parameters["form_compiler"]["quadrature_degree"] = 1
 R = 0.0025
 R_laser = 0.0002
 Z = 0.0005
-T, Nt = 0.010, 100
+T, Nt = 0.010, 30
 dt = T/Nt
 
 # Model constants
@@ -30,11 +30,15 @@ implicitness = Constant("1.0")
 
 # Optimization parameters
 alpha = 0. # temporarily exclude the control cost
-beta = 10**12
-gamma = 10**1
+beta = 1.
+beta_w = 1.
+gamma = 10**-5
 iter_max = 5
 tolerance = 10**-18
 velocity_max = 0.12
+target_point = Point(0, .5*Z)
+threshold_temp = 1102.
+pow_ = 6.
 
 control_ref = np.zeros(Nt)
 
@@ -267,23 +271,40 @@ def solve_adjoint(evolution, control):
     evolution_adj = np.zeros((Nt+1, len(V.dofmap().dofs())))
     evolution_adj[Nt,:] = p_next.vector().get_local()
 
+    # PointSource magnitute precalculation
+    sum_ = 0
+    for k in range(1,Nt+1):
+        theta_next.vector().set_local(evolution[k])
+        sum_ += np.float_power(theta_next(target_point), pow_)
+    norm = np.float_power(sum_, 1/pow_)
+    M = beta_w * (norm - threshold_temp)\
+      * np.float_power(sum_, 1/pow_-1)
+
     # solve backward, i.e. p_next -> p_prev
     theta_next.vector().set_local(evolution[Nt])
     for k in range(Nt,0,-1):
         theta_prev.vector().set_local(evolution[k-1])
 
-        F = a(theta_prev, theta_next, p_prev, Constant(control[k-1]))\
-          + dt * J_expression(theta_prev, theta_next, coefficients, expressions)
+        F = a(theta_prev, theta_next, p_prev, Constant(control[k-1]))
 
         if k < Nt:
             # is it correct that the next line can be omitted?
-            theta_next_.vector().set_local(evolution[k+1])
-            F += a(theta_next, theta_next_, p_next, Constant(control[k]))\
-               + dt * J_expression(theta_next, theta_next_,
-                                   coefficients, expressions)
+            # theta_next_.vector().set_local(evolution[k+1])
+            F += a(theta_next, theta_next_, p_next, Constant(control[k]))
 
         dF = derivative(F,theta_next,v)
-        solve(lhs(dF)==rhs(dF),p)
+        
+        # for k==Nt rhs(dF) is void which leads to a ValueError
+        try:
+            A, b = assemble_system(lhs(dF), rhs(dF))
+        except ValueError:
+            A, b = assemble_system(lhs(dF), Constant(0)*v*dx)
+
+        M_ = np.float_power(theta_next(target_point), pow_-1)
+        ps = PointSource(V, target_point, -M*M_)
+        ps.apply(b)
+        solve(A, p.vector(), b)
+ 
         evolution_adj[k-1,:] = p.vector().get_local()
         p_next.assign(p)
 
@@ -316,7 +337,8 @@ def Dj(evolution_adj, control):
         p.vector().set_local(evolution_adj[i])
         z[i] = assemble(p * x[0] * ds(1))
     
-    Dj = alpha * (control-control_ref) - laser_pd*z
+    # Dj = alpha * (control-control_ref) - laser_pd*z
+    Dj = - laser_pd*z
 
     return Dj
 
@@ -434,7 +456,8 @@ def gradient_test(control, n=15, diff_type='forward', eps_init=.1):
 
     evo = solve_forward(control)
     evo_adj = solve_adjoint(evo, control)
-    time_space = np.linspace(0, T, num=Nt, endpoint=True) 
+    time_space = np.linspace(0, T, num=Nt, endpoint=True)
+    # np.random.seed(0)
     direction = np.random.rand(Nt)
     norm = np.sqrt(dt * np.sum(direction**2))
     direction /= norm
@@ -474,81 +497,15 @@ def gradient_test(control, n=15, diff_type='forward', eps_init=.1):
     return epsilons, deltas
 
 
-def velocity(theta, theta_, velocity_max=velocity_max):
-    theta_m = implicitness*theta_ + (1-implicitness)*theta
-    grad_norm = sqrt(inner(grad(theta_m), grad(theta_m)) + DOLFIN_EPS)
-
-    velocity_ = (theta_ - theta) / dt\
-        / grad_norm\
-        * conditional(ufl.And(ge(theta,solidus), lt(theta_,liquidus)), 1., 0.)
-
-    velocity_ *= conditional(le(velocity_, 0.), 1., 0.)
-    velocity_ *= conditional(ge(-velocity_, velocity_max), 1., 0.)
-    velocity_ *= -1
-
-    return velocity_
-
-
-def liquidity(theta, theta_):
-    theta_m = implicitness*theta_ + (1-implicitness)*theta
-
-    liquidity_ = theta_m - Constant(solidus)
-    liquidity_ *= conditional(ge(liquidity_, 0.), 1., 0.)
-
-    return liquidity_
-
-
-def completenes(theta, theta_):
-    pass
-
-
-expressions = [velocity, liquidity]
-coefficients = [beta, gamma]
-
-def J_expression(theta, theta_, coefficients, expressions):
-    '''Combines multiple penalty terms into single UFL expression.
-
-    The penalty terms are supposed to be control independent.
-    Control effort is not penalized here!
-
-    Usage:
-    J_expression(theta, theta_, [beta, gamma], [velocity, liquidity])
-    J_expression(theta, theta_, coefficients, expressions)
-
-    '''
-
-    return sum(c * e(theta, theta_)**2 * x[0] * dx
-        for c, e in zip(coefficients, expressions))
-
-
-def J_vector(evolution, control, coefficients, expressions):
-    '''WARNING: control cost is presented here!'''
-
+def J_welding(evolution, control):
+    sum_ = 0
     theta = Function(V)
-    theta_ = Function(V)
+    for k in range(1,Nt+1):
+        theta.vector().set_local(evolution[k])
+        sum_ += np.float_power(theta(target_point), pow_)
+    norm = np.float_power(sum_, 1/pow_)
+    result = .5 * beta_w * (norm - threshold_temp)**2
 
-    Nt = len(evolution) - 1
-    J_vector_ = np.zeros(Nt)
+    return result
 
-    theta.vector().set_local(evolution[0])
-    for k in range(Nt):
-        theta_.vector().set_local(evolution[k+1])
-        e = J_expression(theta, theta_, coefficients, expressions)
-        J_vector_[k] = assemble(e)
-        theta.assign(theta_)
-
-    J_vector_ += .5 * alpha *(control-control_ref)**2
-
-    return J_vector_
-
-
-def J_total(evolution, control,
-            coefficients=coefficients,
-            expressions=expressions):
-
-    J_vector_ = J_vector(evolution, control, coefficients, expressions)
-    return dt * J_vector_.sum()
-
-
-# testing gradient_descent with J_expression
-J = J_total
+J = J_welding
