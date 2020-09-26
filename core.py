@@ -116,6 +116,79 @@ sym_axis_boundary.mark(boundary_markers, 3)
 ds = Measure('ds', domain=mesh, subdomain_data=boundary_markers)
 
 
+class Simulation():
+    '''Caches the computation results and keeps related values together.'''
+
+    def __init__(self, control, theta_init=project(theta_amb, V)):
+        self.control = control
+        self._theta_init = theta_init
+
+    @property
+    def control(self):
+        return self._control
+
+    @control.setter
+    def control(self, control_):
+        if not isinstance(control_, np.ndarray):
+            raise TypeError('not a np.ndarray')
+        if not control_.dtype == np.float64:
+            raise TypeError('the type is not np.float64')
+        if not control_.shape == (Nt,):
+            raise ValueError('dimension inconsistency')
+        if not np.array_equal(control_, control_.clip(0, 1)):
+            raise ValueError('infeasible value')
+
+        self._control = control_
+
+    @property
+    def theta_init(self):
+        return self._theta_init
+
+    @theta_init.setter
+    def theta_init(self, theta_init_):
+        if not isinstance(theta_init_, Function):
+            raise TypeError('the type is not a Function')
+
+        self._theta_init = theta_init_
+
+    @property
+    def evo(self):
+        try:
+            return self._evo
+        except AttributeError:
+            self._evo = solve_forward(self.control, self.theta_init)
+            return self._evo
+
+    @property
+    def evo_adj(self):
+        try:
+            return self._evo_adj
+        except AttributeError:
+            self._evo_adj = solve_adjoint(self.evo, self.control)
+            return self._evo_adj
+
+    @property
+    def Dj(self):
+        try:
+            return self._Dj
+        except AttributeError:
+            self._Dj = Dj(self.evo_adj, self.control)
+            return self._Dj
+
+    @property
+    def J(self):
+        try:
+            return self._J_total
+        except AttributeError:
+            self._J_total = J(self.evo, self.control)
+            return self._J_total
+
+    def descend(self, s):
+        control_ = (self.control - s*self.Dj).clip(0, 1)
+        simulation_ = Simulation(control_, self.theta_init)
+        return simulation_
+
+
 with open('material.json') as file:
     material = json.load(file)
 
