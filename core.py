@@ -30,9 +30,9 @@ implicitness = Constant("1.0")
 
 # Optimization parameters
 alpha = 0. # temporarily exclude the control cost
-beta = 10**12
-gamma = 10**1
-iter_max = 5
+beta = 1.
+beta_w = 1.
+gamma = 10**-5
 tolerance = 10**-18
 velocity_max = 0.12
 
@@ -41,6 +41,7 @@ control_ref = np.zeros(Nt)
 # Aggregate state
 liquidus = 923.0
 solidus = 858.0
+
 
 class Domain_2(SubDomain):
     def inside(self, x, on_boundary):
@@ -258,7 +259,6 @@ def a(u, u_, v, intensity):
 
     return a
 
-
 def solve_forward(control, theta_init=project(theta_amb, V)):
     '''Calculates the solution to the forward problem with the given control.
 
@@ -398,62 +398,67 @@ def Dj(evolution_adj, control):
     return Dj
 
 
-def gradient_descent(control, init, iter_max=100, s=512.):
-    '''Calculates the optimal control.
+def gradient_descent(sim, iter_max=50, tolerance=10**-9):
+    '''Runs the gradient descent procedure.
 
     Parameters:
-        control: ndarray
-            Initial guess.
+        sim: Simulation
+            Simulation object used as the initial guess.
         iter_max: integer
-            The maximal allowed number of iterations.
+            The maximal allowed number of major iterations.
+        tolerance: float
+            The gradient descent procedure stops when the gradient norm becomes
+            less than tolerance.
 
     Returns:
-        control_optimal: ndarray
+        descent: [Simulation]
+            List of simulations, corresponding to succesful steps of gradient
+            descent, starting with the provided initial guess.
 
     '''
 
     try:
-        # TODO: change the breaking condition
+        slow_down = False
 
-        evolution = solve_forward(control, init)
-        cost = J(evolution, control)
-        cost_next = cost
+        print('Starting the gradient descent procedure...')
+        descent = [sim]
+        norm_Dj = norm(sim.Dj)
+        s = .5 * norm(sim.control) / norm_Dj
 
-        controls_iterations = []
-        controls_iterations.append(control)
-
-        print('{:>4} {:>12} {:>14} {:>14}'.format('i', 's', 'j', 'norm'))
+        print(f'{"i.j " :>6} {"s":>14} {"J":>14} {"norm_Dj":>14}')
+        print(f'{sim.J:36.7e} {norm_Dj:14.7e}')
 
         for i in range(iter_max):
-            
-            evolution_adj = solve_adjoint(evolution, control)
-            D = Dj(evolution_adj, control)
-            norm = dt * np.sum(D**2)
-            
-            if norm < tolerance:
-                print('norm = {} < tolerance'.format(norm))
+            if norm_Dj < tolerance:
+                print(f'norm(Dj) = {norm_Dj:.7e} < tolerance')
                 break
 
-            first_try = True
-            while (cost_next >= cost) or first_try:
-                control_next = np.clip(control - s*D, 0, 1)
-                evolution_next = solve_forward(control_next, init)
-                cost_next = J(evolution_next, control)
-                print('{:4} {:12.6f} {:14.7e} {:14.7e}'.\
-                    format(i, s, cost_next, norm))
-                if not first_try: s /= 2
-                first_try = False
+            j = 0
+            while True:
+                sim_ = sim.descend(s)
+                if sim_.J < sim.J: break
+                print(f'{i:3}.{j:<2} {s:14.7e} {sim_.J:14.7e}  {13*"-"}')
+                j += 1
+                s /= 2
+                # slow_down = True
 
+            sim = sim_
+            norm_Dj = norm(sim.Dj)
+            print(f'{i:3}.{j:<2} {s:14.7e} {sim.J:14.7e} {norm_Dj:14.7e}')
+            descent.append(sim)
+            # if not slow_down:
             s *= 2
-            control = control_next
-            cost = cost_next
-            evolution = evolution_next
-            controls_iterations.append(control)
+            # slow_down = False
+
+        else:
+            print('Maximal number of iterations was reached.')
 
     except KeyboardInterrupt:
         print('Interrupted by user...')
 
-    return controls_iterations
+    print('Terminating.')
+
+    return descent
 
 
 # def J(evolution, control, as_vector=False, **kwargs):
@@ -624,5 +629,4 @@ def J_total(evolution, control,
     return dt * J_vector_.sum()
 
 
-# testing gradient_descent with J_expression
 J = J_total
