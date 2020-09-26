@@ -241,7 +241,11 @@ def u(t, t1=0.005, t2=0.010):
         return (t2-t)/(t2-t1)
     else:
         return 0.
- 
+
+
+def norm(vector):
+    return sqrt(dt * sum(vector**2))
+
 
 def a(u, u_, v, intensity):
 
@@ -478,18 +482,18 @@ def gradient_descent(control, init, iter_max=100, s=512.):
 
 
 
-def gradient_test(control, n=15, diff_type='forward', eps_init=.1):
+def gradient_test(simulation, n=15, diff_type='forward', eps_init=.1):
     '''Checks the accuracy of the calculated gradient Dj.
 
-    The scalar product (Dj,direction) is calculated and
-    compared to the finite difference expression for J w.r.t. direction,
-    the absolute error and the relative error are calculated.
+    The finite difference for J w.r.t. a random normalized direction is compared
+    to the inner product (Dj,direction),  the absolute and the relative errors
+    are calculated.
 
     Every iteration epsilon is divided by two.
 
     Parameters:
-        control: ndarray
-            Control used for testing.
+        simulation: Simulation
+            Initial simulation used for testing.
         n: integer
             Number of tests.
         diff_type: 'forward' (default) or 'two_sided'
@@ -498,51 +502,48 @@ def gradient_test(control, n=15, diff_type='forward', eps_init=.1):
             The initial value of epsilon.
 
     Returns:
-        epsilons: array-like
+        epsilons: [float]
             Epsilons used for testing.
-        deltas: array-like
+        deltas: [float]
             Relative errors.
 
     '''
 
-    evo = solve_forward(control)
-    evo_adj = solve_adjoint(evo, control)
-    time_space = np.linspace(0, T, num=Nt, endpoint=True) 
+    print('Starting the gradient test...')
+    # np.random.seed(0)
     direction = np.random.rand(Nt)
-    norm = np.sqrt(dt * np.sum(direction**2))
-    direction /= norm
+    direction /= norm(direction)
     direction *= .0005 * T
 
-
-    D = Dj(evo_adj, control)
-    print('{:>16}{:>16}{:>16}{:>16}{:>16}'.\
-        format('epsilon', '(Dj,direction)', 'finite diff', 'absolute error',
-               'relative error'))
+    theta_init = simulation.theta_init
+    D = simulation.Dj
 
     epsilons = [eps_init * 2**-k for k in range(n)]
     deltas = []
 
-    scalar_product = dt * np.sum(D*direction)
+    inner_product = dt * np.sum(D*direction)
+    print(f'    inner(Dj,direction) = {inner_product:.8e}')
+    print(f'{"epsilon":>20}{"diff":>20}{"delta_abs":>20}{"delta":>20}')
 
     for eps in epsilons:
         
         if diff_type == 'forward':
-            control_eps = control + eps * direction
-            evo_eps = solve_forward(control_eps)
-            diff = (J(evo_eps, control_eps) - J(evo, control)) / eps
+            control_ = (simulation.control + eps * direction).clip(0, 1)
+            simulation_ = Simulation(control_, theta_init)
+            diff = (simulation_.J - simulation.J) / eps
+
         elif diff_type == 'two_sided':
-            control_plus_eps = control + eps * direction
-            evo_plus_eps = solve_forward(control_plus_eps)
-            control_minus_eps = control - eps * direction
-            evo_minus_eps = solve_forward(control_minus_eps)
-            diff = (J(evo_plus_eps, control_plus_eps)
-                       - J(evo_minus_eps, control_minus_eps)) / (2 * eps)            
+            control_ = (control - eps * direction).clip(0, 1)
+            simulation_ = Simulation(control_, theta_init)
+            control__ = (control + eps * direction).clip(0, 1)
+            simulation__ = Simulation(control__, theta_init)
+            diff = (simulation__.J - simulation_.J) / (2 * eps)
         
-        delta_abs = scalar_product - diff
-        delta_rel = delta_abs / scalar_product
-        deltas.append(delta_rel)
-        print('{:16.8e}{:16.8e}{:16.8e}{:16.8e}{:16.8e}'.\
-            format(eps, scalar_product, diff, delta_abs, delta_rel))
+        delta_abs = inner_product - diff
+        delta = delta_abs / inner_product
+        deltas.append(delta)
+
+        print(f'{eps:20.8e}{diff:20.8e}{delta_abs:20.8e}{delta:20.8e}')
 
     return epsilons, deltas
 
