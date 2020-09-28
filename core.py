@@ -17,7 +17,7 @@ parameters["form_compiler"]["quadrature_degree"] = 1
 R = 0.0025
 R_laser = 0.0002
 Z = 0.0005
-T, Nt = 0.010, 100
+T, Nt = 0.010, 30
 dt = T/Nt
 
 # Model constants
@@ -30,17 +30,20 @@ implicitness = Constant("1.0")
 
 # Optimization parameters
 alpha = 0. # temporarily exclude the control cost
-beta = 10**12
-gamma = 10**1
-iter_max = 5
-tolerance = 10**-18
+beta = 1.
+beta_w = 1.
+gamma = 10**-5
 velocity_max = 0.12
+target_point = Point(0, .5*Z)
+threshold_temp = 1102.
+pow_ = 6.
 
 control_ref = np.zeros(Nt)
 
 # Aggregate state
 liquidus = 923.0
 solidus = 858.0
+
 
 class Domain_2(SubDomain):
     def inside(self, x, on_boundary):
@@ -116,6 +119,79 @@ sym_axis_boundary.mark(boundary_markers, 3)
 ds = Measure('ds', domain=mesh, subdomain_data=boundary_markers)
 
 
+class Simulation():
+    '''Caches the computation results and keeps related values together.'''
+
+    def __init__(self, control, theta_init=project(theta_amb, V)):
+        self.control = control
+        self._theta_init = theta_init
+
+    @property
+    def control(self):
+        return self._control
+
+    @control.setter
+    def control(self, control_):
+        if not isinstance(control_, np.ndarray):
+            raise TypeError('not a np.ndarray')
+        if not control_.dtype == np.float64:
+            raise TypeError('the type is not np.float64')
+        if not control_.shape == (Nt,):
+            raise ValueError('dimension inconsistency')
+        if not np.array_equal(control_, control_.clip(0, 1)):
+            raise ValueError('infeasible value')
+
+        self._control = control_
+
+    @property
+    def theta_init(self):
+        return self._theta_init
+
+    @theta_init.setter
+    def theta_init(self, theta_init_):
+        if not isinstance(theta_init_, Function):
+            raise TypeError('the type is not a Function')
+
+        self._theta_init = theta_init_
+
+    @property
+    def evo(self):
+        try:
+            return self._evo
+        except AttributeError:
+            self._evo = solve_forward(self.control, self.theta_init)
+            return self._evo
+
+    @property
+    def evo_adj(self):
+        try:
+            return self._evo_adj
+        except AttributeError:
+            self._evo_adj = solve_adjoint(self.evo, self.control)
+            return self._evo_adj
+
+    @property
+    def Dj(self):
+        try:
+            return self._Dj
+        except AttributeError:
+            self._Dj = Dj(self.evo_adj, self.control)
+            return self._Dj
+
+    @property
+    def J(self):
+        try:
+            return self._J_total
+        except AttributeError:
+            self._J_total = J(self.evo, self.control)
+            return self._J_total
+
+    def descend(self, s):
+        control_ = (self.control - s*self.Dj).clip(0, 1)
+        simulation_ = Simulation(control_, self.theta_init)
+        return simulation_
+
+
 with open('material.json') as file:
     material = json.load(file)
 
@@ -168,7 +244,11 @@ def u(t, t1=0.005, t2=0.010):
         return (t2-t)/(t2-t1)
     else:
         return 0.
- 
+
+
+def norm(vector):
+    return sqrt(dt * sum(vector**2))
+
 
 def a(u, u_, v, intensity):
 
@@ -180,7 +260,6 @@ def a(u, u_, v, intensity):
       - dt * cooling_bc(u_m) * v * x[0] * (ds(1) + ds(2))
 
     return a
-
 
 def solve_forward(control, theta_init=project(theta_amb, V)):
     '''Calculates the solution to the forward problem with the given control.
@@ -267,6 +346,15 @@ def solve_adjoint(evolution, control):
     evolution_adj = np.zeros((Nt+1, len(V.dofmap().dofs())))
     evolution_adj[Nt,:] = p_next.vector().get_local()
 
+    # PointSource magnitute precalculation
+    sum_ = 0
+    for k in range(1,Nt+1):
+        theta_next.vector().set_local(evolution[k])
+        sum_ += np.float_power(theta_next(target_point), pow_)
+    norm = np.float_power(sum_, 1/pow_)
+    M = beta_w * (norm - threshold_temp)\
+      * np.float_power(sum_, 1/pow_-1)
+
     # solve backward, i.e. p_next -> p_prev
     theta_next.vector().set_local(evolution[Nt])
     for k in range(Nt,0,-1):
@@ -277,13 +365,24 @@ def solve_adjoint(evolution, control):
 
         if k < Nt:
             # is it correct that the next line can be omitted?
-            theta_next_.vector().set_local(evolution[k+1])
+            # theta_next_.vector().set_local(evolution[k+1])
             F += a(theta_next, theta_next_, p_next, Constant(control[k]))\
                + dt * J_expression(theta_next, theta_next_,
                                    coefficients, expressions)
 
         dF = derivative(F,theta_next,v)
-        solve(lhs(dF)==rhs(dF),p)
+        
+        # for k==Nt rhs(dF) is void which leads to a ValueError
+        try:
+            A, b = assemble_system(lhs(dF), rhs(dF))
+        except ValueError:
+            A, b = assemble_system(lhs(dF), Constant(0)*v*dx)
+
+        M_ = np.float_power(theta_next(target_point), pow_-1)
+        ps = PointSource(V, target_point, -M*M_)
+        ps.apply(b)
+        solve(A, p.vector(), b)
+ 
         evolution_adj[k-1,:] = p.vector().get_local()
         p_next.assign(p)
 
@@ -321,62 +420,67 @@ def Dj(evolution_adj, control):
     return Dj
 
 
-def gradient_descent(control, init, iter_max=100, s=512.):
-    '''Calculates the optimal control.
+def gradient_descent(sim, iter_max=50, tolerance=10**-9):
+    '''Runs the gradient descent procedure.
 
     Parameters:
-        control: ndarray
-            Initial guess.
+        sim: Simulation
+            Simulation object used as the initial guess.
         iter_max: integer
-            The maximal allowed number of iterations.
+            The maximal allowed number of major iterations.
+        tolerance: float
+            The gradient descent procedure stops when the gradient norm becomes
+            less than tolerance.
 
     Returns:
-        control_optimal: ndarray
+        descent: [Simulation]
+            List of simulations, corresponding to succesful steps of gradient
+            descent, starting with the provided initial guess.
 
     '''
 
     try:
-        # TODO: change the breaking condition
+        slow_down = False
 
-        evolution = solve_forward(control, init)
-        cost = J(evolution, control)
-        cost_next = cost
+        print('Starting the gradient descent procedure...')
+        descent = [sim]
+        norm_Dj = norm(sim.Dj)
+        s = .5 * norm(sim.control) / norm_Dj
 
-        controls_iterations = []
-        controls_iterations.append(control)
-
-        print('{:>4} {:>12} {:>14} {:>14}'.format('i', 's', 'j', 'norm'))
+        print(f'{"i.j " :>6} {"s":>14} {"J":>14} {"norm_Dj":>14}')
+        print(f'{sim.J:36.7e} {norm_Dj:14.7e}')
 
         for i in range(iter_max):
-            
-            evolution_adj = solve_adjoint(evolution, control)
-            D = Dj(evolution_adj, control)
-            norm = dt * np.sum(D**2)
-            
-            if norm < tolerance:
-                print('norm = {} < tolerance'.format(norm))
+            if norm_Dj < tolerance:
+                print(f'norm(Dj) = {norm_Dj:.7e} < tolerance')
                 break
 
-            first_try = True
-            while (cost_next >= cost) or first_try:
-                control_next = np.clip(control - s*D, 0, 1)
-                evolution_next = solve_forward(control_next, init)
-                cost_next = J(evolution_next, control)
-                print('{:4} {:12.6f} {:14.7e} {:14.7e}'.\
-                    format(i, s, cost_next, norm))
-                if not first_try: s /= 2
-                first_try = False
+            j = 0
+            while True:
+                sim_ = sim.descend(s)
+                if sim_.J < sim.J: break
+                print(f'{i:3}.{j:<2} {s:14.7e} {sim_.J:14.7e}  {13*"-"}')
+                j += 1
+                s /= 2
+                # slow_down = True
 
+            sim = sim_
+            norm_Dj = norm(sim.Dj)
+            print(f'{i:3}.{j:<2} {s:14.7e} {sim.J:14.7e} {norm_Dj:14.7e}')
+            descent.append(sim)
+            # if not slow_down:
             s *= 2
-            control = control_next
-            cost = cost_next
-            evolution = evolution_next
-            controls_iterations.append(control)
+            # slow_down = False
+
+        else:
+            print('Maximal number of iterations was reached.')
 
     except KeyboardInterrupt:
         print('Interrupted by user...')
 
-    return controls_iterations
+    print('Terminating.')
+
+    return descent
 
 
 # def J(evolution, control, as_vector=False, **kwargs):
@@ -405,18 +509,18 @@ def gradient_descent(control, init, iter_max=100, s=512.):
 
 
 
-def gradient_test(control, n=15, diff_type='forward', eps_init=.1):
+def gradient_test(simulation, n=15, diff_type='forward', eps_init=.1):
     '''Checks the accuracy of the calculated gradient Dj.
 
-    The scalar product (Dj,direction) is calculated and
-    compared to the finite difference expression for J w.r.t. direction,
-    the absolute error and the relative error are calculated.
+    The finite difference for J w.r.t. a random normalized direction is compared
+    to the inner product (Dj,direction),  the absolute and the relative errors
+    are calculated.
 
     Every iteration epsilon is divided by two.
 
     Parameters:
-        control: ndarray
-            Control used for testing.
+        simulation: Simulation
+            Initial simulation used for testing.
         n: integer
             Number of tests.
         diff_type: 'forward' (default) or 'two_sided'
@@ -425,51 +529,48 @@ def gradient_test(control, n=15, diff_type='forward', eps_init=.1):
             The initial value of epsilon.
 
     Returns:
-        epsilons: array-like
+        epsilons: [float]
             Epsilons used for testing.
-        deltas: array-like
+        deltas: [float]
             Relative errors.
 
     '''
 
-    evo = solve_forward(control)
-    evo_adj = solve_adjoint(evo, control)
-    time_space = np.linspace(0, T, num=Nt, endpoint=True) 
+    print('Starting the gradient test...')
+    # np.random.seed(0)
     direction = np.random.rand(Nt)
-    norm = np.sqrt(dt * np.sum(direction**2))
-    direction /= norm
+    direction /= norm(direction)
     direction *= .0005 * T
 
-
-    D = Dj(evo_adj, control)
-    print('{:>16}{:>16}{:>16}{:>16}{:>16}'.\
-        format('epsilon', '(Dj,direction)', 'finite diff', 'absolute error',
-               'relative error'))
+    theta_init = simulation.theta_init
+    D = simulation.Dj
 
     epsilons = [eps_init * 2**-k for k in range(n)]
     deltas = []
 
-    scalar_product = dt * np.sum(D*direction)
+    inner_product = dt * np.sum(D*direction)
+    print(f'    inner(Dj,direction) = {inner_product:.8e}')
+    print(f'{"epsilon":>20}{"diff":>20}{"delta_abs":>20}{"delta":>20}')
 
     for eps in epsilons:
         
         if diff_type == 'forward':
-            control_eps = control + eps * direction
-            evo_eps = solve_forward(control_eps)
-            diff = (J(evo_eps, control_eps) - J(evo, control)) / eps
+            control_ = (simulation.control + eps * direction).clip(0, 1)
+            simulation_ = Simulation(control_, theta_init)
+            diff = (simulation_.J - simulation.J) / eps
+
         elif diff_type == 'two_sided':
-            control_plus_eps = control + eps * direction
-            evo_plus_eps = solve_forward(control_plus_eps)
-            control_minus_eps = control - eps * direction
-            evo_minus_eps = solve_forward(control_minus_eps)
-            diff = (J(evo_plus_eps, control_plus_eps)
-                       - J(evo_minus_eps, control_minus_eps)) / (2 * eps)            
+            control_ = (control - eps * direction).clip(0, 1)
+            simulation_ = Simulation(control_, theta_init)
+            control__ = (control + eps * direction).clip(0, 1)
+            simulation__ = Simulation(control__, theta_init)
+            diff = (simulation__.J - simulation_.J) / (2 * eps)
         
-        delta_abs = scalar_product - diff
-        delta_rel = delta_abs / scalar_product
-        deltas.append(delta_rel)
-        print('{:16.8e}{:16.8e}{:16.8e}{:16.8e}{:16.8e}'.\
-            format(eps, scalar_product, diff, delta_abs, delta_rel))
+        delta_abs = inner_product - diff
+        delta = delta_abs / inner_product
+        deltas.append(delta)
+
+        print(f'{eps:20.8e}{diff:20.8e}{delta_abs:20.8e}{delta:20.8e}')
 
     return epsilons, deltas
 
@@ -550,5 +651,15 @@ def J_total(evolution, control,
     return dt * J_vector_.sum()
 
 
-# testing gradient_descent with J_expression
-J = J_total
+def J_welding(evolution, control):
+    sum_ = 0
+    theta = Function(V)
+    for k in range(1,Nt+1):
+        theta.vector().set_local(evolution[k])
+        sum_ += np.float_power(theta(target_point), pow_)
+    norm = np.float_power(sum_, 1/pow_)
+    result = .5 * beta_w * (norm - threshold_temp)**2
+
+    return result
+
+J = J_welding

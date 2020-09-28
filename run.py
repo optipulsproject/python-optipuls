@@ -21,9 +21,11 @@ theta_hot.vector().set_local(theta_hot_np)
 time_space = np.linspace(0, T, num=Nt, endpoint=True)
 
 control = .25 * np.sin(time_space*np.pi / (2*T)) + .5
-epsilons, deltas_fwd = gradient_test(control, n=15)
-gradient_test_plot(epsilons, deltas_fwd)
-
+control[:] = .5
+s = Simulation(control)
+# epsilons, deltas_fwd = gradient_test(s, n=15)
+# gradient_test_plot(epsilons, deltas_fwd)
+descent = gradient_descent(s, iter_max=20)
 
 # print("Starting optimization process")
 # control = np.vectorize(u)(time_space, t1=0, t2=0.005)
