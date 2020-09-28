@@ -17,7 +17,7 @@ parameters["form_compiler"]["quadrature_degree"] = 1
 R = 0.0025
 R_laser = 0.0002
 Z = 0.0005
-T, Nt = 0.010, 100
+T, Nt = 0.010, 30
 dt = T/Nt
 
 # Model constants
@@ -30,11 +30,15 @@ implicitness = Constant("1.0")
 
 # Optimization parameters
 alpha = 0. # temporarily exclude the control cost
-beta = 10**12
-gamma = 10**1
+beta = 1.
+beta_w = 1.
+gamma = 10**-5
 iter_max = 5
 tolerance = 10**-18
 velocity_max = 0.12
+target_point = Point(0, .5*Z)
+threshold_temp = 1102.
+pow_ = 6.
 
 control_ref = np.zeros(Nt)
 
@@ -267,6 +271,15 @@ def solve_adjoint(evolution, control):
     evolution_adj = np.zeros((Nt+1, len(V.dofmap().dofs())))
     evolution_adj[Nt,:] = p_next.vector().get_local()
 
+    # PointSource magnitute precalculation
+    sum_ = 0
+    for k in range(1,Nt+1):
+        theta_next.vector().set_local(evolution[k])
+        sum_ += np.float_power(theta_next(target_point), pow_)
+    norm = np.float_power(sum_, 1/pow_)
+    M = beta_w * (norm - threshold_temp)\
+      * np.float_power(sum_, 1/pow_-1)
+
     # solve backward, i.e. p_next -> p_prev
     theta_next.vector().set_local(evolution[Nt])
     for k in range(Nt,0,-1):
@@ -277,13 +290,24 @@ def solve_adjoint(evolution, control):
 
         if k < Nt:
             # is it correct that the next line can be omitted?
-            theta_next_.vector().set_local(evolution[k+1])
+            # theta_next_.vector().set_local(evolution[k+1])
             F += a(theta_next, theta_next_, p_next, Constant(control[k]))\
                + dt * J_expression(theta_next, theta_next_,
                                    coefficients, expressions)
 
         dF = derivative(F,theta_next,v)
-        solve(lhs(dF)==rhs(dF),p)
+        
+        # for k==Nt rhs(dF) is void which leads to a ValueError
+        try:
+            A, b = assemble_system(lhs(dF), rhs(dF))
+        except ValueError:
+            A, b = assemble_system(lhs(dF), Constant(0)*v*dx)
+
+        M_ = np.float_power(theta_next(target_point), pow_-1)
+        ps = PointSource(V, target_point, -M*M_)
+        ps.apply(b)
+        solve(A, p.vector(), b)
+ 
         evolution_adj[k-1,:] = p.vector().get_local()
         p_next.assign(p)
 
@@ -434,7 +458,8 @@ def gradient_test(control, n=15, diff_type='forward', eps_init=.1):
 
     evo = solve_forward(control)
     evo_adj = solve_adjoint(evo, control)
-    time_space = np.linspace(0, T, num=Nt, endpoint=True) 
+    time_space = np.linspace(0, T, num=Nt, endpoint=True)
+    # np.random.seed(0)
     direction = np.random.rand(Nt)
     norm = np.sqrt(dt * np.sum(direction**2))
     direction /= norm
@@ -550,5 +575,15 @@ def J_total(evolution, control,
     return dt * J_vector_.sum()
 
 
-# testing gradient_descent with J_expression
-J = J_total
+def J_welding(evolution, control):
+    sum_ = 0
+    theta = Function(V)
+    for k in range(1,Nt+1):
+        theta.vector().set_local(evolution[k])
+        sum_ += np.float_power(theta(target_point), pow_)
+    norm = np.float_power(sum_, 1/pow_)
+    result = .5 * beta_w * (norm - threshold_temp)**2
+
+    return result
+
+J = J_welding
