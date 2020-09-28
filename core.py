@@ -398,7 +398,7 @@ def Dj(evolution_adj, control):
     return Dj
 
 
-def gradient_descent(sim, iter_max=50, tolerance=10**-9):
+def gradient_descent(sim, iter_max=50, tolerance=10**-9, sigma=10**-4):
     '''Runs the gradient descent procedure.
 
     Parameters:
@@ -436,19 +436,18 @@ def gradient_descent(sim, iter_max=50, tolerance=10**-9):
             j = 0
             while True:
                 sim_ = sim.descend(s)
-                if sim_.J < sim.J: break
+                if sim_.J < sim.J - sigma*s*norm_Dj**2:
+                    break
                 print(f'{i:3}.{j:<2} {s:14.7e} {sim_.J:14.7e}  {13*"-"}')
                 j += 1
                 s /= 2
-                # slow_down = True
 
-            sim = sim_
-            norm_Dj = norm(sim.Dj)
-            print(f'{i:3}.{j:<2} {s:14.7e} {sim.J:14.7e} {norm_Dj:14.7e}')
-            descent.append(sim)
-            # if not slow_down:
-            s *= 2
-            # slow_down = False
+            s_ = s * norm_Dj**2
+            norm_Dj = norm(sim_.Dj)
+            print(f'{i:3}.{j:<2} {s:14.7e} {sim_.J:14.7e} {norm_Dj:14.7e}')
+            descent.append(sim_)
+            s_ /= norm_Dj**2
+            sim, s = sim_, s_
 
         else:
             print('Maximal number of iterations was reached.')
