@@ -10,6 +10,10 @@ import json
 
 import splines as spl
 
+
+class Problem:
+    pass
+
 set_log_level(40)
 parameters["form_compiler"]["quadrature_degree"] = 1
 
@@ -382,7 +386,7 @@ def solve_adjoint(evolution, control):
         ps = PointSource(V, target_point, -M*M_)
         ps.apply(b)
         solve(A, p.vector(), b)
- 
+
         evolution_adj[k-1,:] = p.vector().get_local()
         p_next.assign(p)
 
@@ -445,7 +449,7 @@ def gradient_descent(sim, iter_max=50, tolerance=10**-9):
         print('Starting the gradient descent procedure...')
         descent = [sim]
         norm_Dj = norm(sim.Dj)
-        s = .5 * norm(sim.control) / norm_Dj
+        s = 2**-10 * .5 * norm(sim.control) / norm_Dj
 
         print(f'{"i.j " :>6} {"s":>14} {"J":>14} {"norm_Dj":>14}')
         print(f'{sim.J:36.7e} {norm_Dj:14.7e}')
@@ -643,14 +647,6 @@ def J_vector(evolution, control, coefficients, expressions):
     return J_vector_
 
 
-def J_total(evolution, control,
-            coefficients=coefficients,
-            expressions=expressions):
-
-    J_vector_ = J_vector(evolution, control, coefficients, expressions)
-    return dt * J_vector_.sum()
-
-
 def J_welding(evolution, control):
     sum_ = 0
     theta = Function(V)
@@ -662,4 +658,14 @@ def J_welding(evolution, control):
 
     return result
 
-J = J_welding
+
+def J_total(evolution, control,
+            coefficients=coefficients,
+            expressions=expressions):
+
+    J_vector_ = J_vector(evolution, control, coefficients, expressions)
+    J_total_ = dt * J_vector_.sum() + J_welding(evolution, control)
+
+    return J_total_
+
+J = J_total

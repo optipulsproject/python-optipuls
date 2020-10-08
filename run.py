@@ -25,7 +25,7 @@ control[:] = .5
 s = Simulation(control)
 # epsilons, deltas_fwd = gradient_test(s, n=15)
 # gradient_test_plot(epsilons, deltas_fwd)
-descent = gradient_descent(s, iter_max=20)
+descent = gradient_descent(s, iter_max=50)
 
 # print("Starting optimization process")
 # control = np.vectorize(u)(time_space, t1=0, t2=0.005)
