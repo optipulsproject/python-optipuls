@@ -40,21 +40,26 @@ class Spline:
         pass
 
     def as_ufl(self):
-        # assigning left polynomial
-        expression = conditional(lt(t, knots[0]), 1., 0.)\
-                   * Polynomial(coef_array[0])(t)
+        def ufl_spline(t):
+            knots = self.knots
+            coef_array = self.coef_array
+            
+            # assigning left polynomial
+            expression = conditional(lt(t, knots[0]), 1., 0.)\
+                       * Polynomial(coef_array[0])(t)
 
-        # assigning internal polynomials
-        for knot, knot_, coefficients in\
-                zip(knots[:-1], knots[1:], coef_array[1:-1]):
-            expression += conditional(And(ge(t, knot), lt(t, knot_)), 1., 0.)\
-                        * Polynomial(coefficients)(t)
+            # assigning internal polynomials
+            for knot, knot_, coefficients in\
+                    zip(knots[:-1], knots[1:], coef_array[1:-1]):
+                expression += conditional(And(ge(t, knot), lt(t, knot_)), 1., 0.)\
+                            * Polynomial(coefficients)(t)
 
-        # assigning right polynomial
-        expression += conditional(ge(t, knots[-1]), 1., 0.)\
-                    * Polynomial(coef_array[-1])(t)
+            # assigning right polynomial
+            expression += conditional(ge(t, knots[-1]), 1., 0.)\
+                        * Polynomial(coef_array[-1])(t)
 
-        return expression
+            return expression
+        return ufl_spline
 
 
 class HermiteSpline(Spline):
