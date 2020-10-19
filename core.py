@@ -237,15 +237,6 @@ def cooling_bc(theta):
            - 2.26 * 10**(-9) * (theta**4-theta_amb**4)
 
 
-def u(t, t1=0.005, t2=0.010):
-    if t < t1:
-        return 1.
-    elif t < t2:
-        return (t2-t)/(t2-t1)
-    else:
-        return 0.
-
-
 def norm(vector):
     return sqrt(dt * sum(vector**2))
 
