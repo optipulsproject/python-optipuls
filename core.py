@@ -298,18 +298,6 @@ def solve_forward(control, theta_init=project(theta_amb, V)):
     return evolution
 
 
-def save_as_npy(evolution, filename='evolution.npy'):
-    np.save(filename, evolution)
-
-def save_as_pvd(evolution, filename='evolution.pvd'):
-    outfile = File(filename)
-    theta = Function(V)
-    for k in range(Nt+1):
-        theta.vector().set_local(evolution[k])
-        theta.rename("theta", "temperature")
-        outfile << theta, k
-
-
 def solve_adjoint(evolution, control):
     '''Calculates the solution to the adjoint problem.
 
