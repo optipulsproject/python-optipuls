@@ -68,24 +68,22 @@ class HermiteSpline(Spline):
             raise ValueError('dimension inconsistency')
         if not len(knots) == len(derivatives):
             raise ValueError('dimension inconsistency')
-
-        # calculate coefficients for internal [1:-1] polynomials
-        # as if each of them was defined on [0,1]
-        # match required values and derivatives on the left
-        coef_left = np.outer(values[:-1], h00) + np.outer(derivatives[:-1], h10)
-        # match required values and derivatives on the right
-        coef_right = np.outer(values[1:], h01) + np.outer(derivatives[1:], h11)
-        # fixed number of coefficients for cubic polynomials
-        coef_array = np.zeros((len(knots)+1, 4), dtype=float)
-        coef_array[1:-1] = coef_left + coef_right
         
-        # scaling polynomials using domain and window properties from NumPy
-        for knot, knot_, coefficients in\
-                zip(knots[:-1], knots[1:], coef_array[1:-1]):
-            p = Polynomial(coefficients, domain=[knot, knot_], window=[0,1])
+        coef_array = np.zeros((len(knots)+1, 4), dtype=float)
+
+        # domain and window together with convert() from numpy.polynomial
+        # are used as a linear mapping t = (x - knot) / (knot_ - knot) 
+        for knot, knot_, p, p_, m, m_, coef in\
+                zip(knots[:-1], knots[1:],
+                    values[:-1], values[1:],
+                    derivatives[:-1], derivatives[1:],
+                    coef_array[1:-1]):
+
+            coef_unscaled = h00*p + h01*p_ + (h10*m + h11*m_) * (knot_ - knot)
+
+            p = Polynomial(coef_unscaled, domain=[knot, knot_], window=[0,1])
             p = p.convert()
-            coefficients[:] = 0
-            coefficients[:len(p.coef)] = p.coef
+            coef[:len(p.coef)] = p.coef
 
         # assigning the left and the right polynomials based on the preferred
         # extrapolation method
