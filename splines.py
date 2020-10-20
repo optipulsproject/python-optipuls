@@ -114,7 +114,7 @@ class NaiveHermiteSpline(HermiteSpline):
                  extrapolation_left='constant',
                  extrapolation_right='constant'):
 
-        derivatives = np.gradient(values)
+        derivatives = np.gradient(values, knots)
 
         HermiteSpline.__init__(self, knots, values, derivatives,
                                extrapolation_left, extrapolation_right)
