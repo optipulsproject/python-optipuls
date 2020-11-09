@@ -31,7 +31,7 @@ implicitness = Constant("1.0")
 # Optimization parameters
 alpha = 0. # temporarily exclude the control cost
 beta = 1.
-beta_w = 1.
+beta_welding = 1.
 gamma = 10**-5
 velocity_max = 0.12
 target_point = Point(0, .5*Z)
@@ -293,9 +293,9 @@ def solve_adjoint(evolution, control):
     '''Calculates the solution to the adjoint problem.
 
     The solution to the adjoint equation is calculated using the explicitly
-    given evolution (solution to the forward problem) and control.
-    The objective function is provided implicitly and represented in the code
-    by J_expression.
+    given evolution (solution to the forward problem) and the control.
+    The objective function is provided implicitly and represented in the adjoint
+    solver by penalty_expression.
 
     For better understanding of the indeces see docs/indexing-diagram.txt.
 
@@ -304,7 +304,7 @@ def solve_adjoint(evolution, control):
             The coefficients of the solution to the corresponding forward
             problem in the basis of the space V (see solve_forward).
         control: ndarray
-            The laser power coefficient for every time step. 
+            The laser power profile. 
 
     Returns:
         evolution_adj: ndarray
@@ -313,60 +313,68 @@ def solve_adjoint(evolution, control):
             
     '''
 
-    p_prev = TrialFunction(V)
-    p_next = Function(V)
-    p = Function(V)
-    theta_next = Function(V)
-    theta_prev = Function(V)
-    theta_next_ = Function(V)
+    # initialize state functions
+    theta_km1 = Function(V)  # stands for theta[k-1]
+    theta_k = Function(V)    # stands for theta[k]
+    theta_kp1 = Function(V)  # stands for theta[k+1]
+
+    # initialize adjoint state functions
+    p_km1 = Function(V)      # stands for p[k-1]
+    p_k = Function(V)        # stands for p[k]
+
+    # FEM equation setup
+    p = TrialFunction(V)     # stands for unknown p[k-1]
     v = TestFunction(V)
 
     Nt = len(control)
     evolution_adj = np.zeros((Nt+1, len(V.dofmap().dofs())))
-    evolution_adj[Nt,:] = p_next.vector().get_local()
 
     # PointSource magnitute precalculation
     sum_ = 0
-    for k in range(1,Nt+1):
-        theta_next.vector().set_local(evolution[k])
-        sum_ += np.float_power(theta_next(target_point), pow_)
-    norm = np.float_power(sum_, 1/pow_)
-    M = beta_w * (norm - threshold_temp)\
-      * np.float_power(sum_, 1/pow_-1)
+    for k in range(1, Nt+1):
+        theta_k.vector().set_local(evolution[k])
+        sum_ += theta_k(target_point) ** pow_
+    p_norm = sum_ ** (1 / pow_)
+    magnitude_1 = beta_welding * (p_norm - threshold_temp) * sum_ ** (1/pow_ - 1)
 
-    # solve backward, i.e. p_next -> p_prev
-    theta_next.vector().set_local(evolution[Nt])
-    for k in range(Nt,0,-1):
-        theta_prev.vector().set_local(evolution[k-1])
+    # preparing for the first iteration
+    # p[Nt] is never used so does not need initialization
+    theta_k.vector().set_local(evolution[Nt])
 
-        F = a(theta_prev, theta_next, p_prev, Constant(control[k-1]))\
-          + dt * J_expression(theta_prev, theta_next, coefficients, expressions)
+    # solve backward, i.e. p_k -> p = p_km1, k = Nt, Nt-1, Nt-2, ..., 1
+    for k in range(Nt, 0, -1):
+        theta_km1.vector().set_local(evolution[k-1])
+
+        F = a(theta_km1, theta_k, p, Constant(control[k-1]))\
+          + dt * J_expression(theta_km1, theta_k, coefficients, expressions)
 
         if k < Nt:
             # is it correct that the next line can be omitted?
             # theta_next_.vector().set_local(evolution[k+1])
-            F += a(theta_next, theta_next_, p_next, Constant(control[k]))\
-               + dt * J_expression(theta_next, theta_next_,
-                                   coefficients, expressions)
+            F += a(theta_k, theta_kp1, p_k, Constant(control[k]))\
+               + dt * J_expression(theta_k, theta_kp1, coefficients, expressions)
 
-        dF = derivative(F,theta_next,v)
+        dF = derivative(F, theta_k, v)
         
-        # for k==Nt rhs(dF) is void which leads to a ValueError
+        # sometimes rhs(dF) is void which leads to a ValueError
         try:
             A, b = assemble_system(lhs(dF), rhs(dF))
         except ValueError:
             A, b = assemble_system(lhs(dF), Constant(0)*v*dx)
 
-        M_ = np.float_power(theta_next(target_point), pow_-1)
-        ps = PointSource(V, target_point, -M*M_)
+        # calculate and apply PointSource total magnitude
+        magnitude_2 = theta_k(target_point) ** (pow_-1)
+        ps = PointSource(V, target_point, - magnitude_1 * magnitude_2)
         ps.apply(b)
-        solve(A, p.vector(), b)
- 
-        evolution_adj[k-1,:] = p.vector().get_local()
-        p_next.assign(p)
 
-        theta_next_.assign(theta_next)
-        theta_next.assign(theta_prev)
+        solve(A, p_km1.vector(), b)
+ 
+        evolution_adj[k-1] = p_km1.vector().get_local()
+
+        # preparing for the next iteration
+        p_k.assign(p_km1)
+        theta_kp1.assign(theta_k)
+        theta_k.assign(theta_km1)
 
     return evolution_adj
 
@@ -637,7 +645,7 @@ def J_welding(evolution, control):
         theta.vector().set_local(evolution[k])
         sum_ += np.float_power(theta(target_point), pow_)
     norm = np.float_power(sum_, 1/pow_)
-    result = .5 * beta_w * (norm - threshold_temp)**2
+    result = .5 * beta_welding * (norm - threshold_temp)**2
 
     return result
 
