@@ -496,7 +496,7 @@ def gradient_descent(sim, iter_max=50, tolerance=10**-9):
 
 
 
-def gradient_test(simulation, n=15, diff_type='forward', eps_init=.1):
+def gradient_test(simulation, iter_max=15, eps_init=.1, diff_type='forward'):
     '''Checks the accuracy of the calculated gradient Dj.
 
     The finite difference for J w.r.t. a random normalized direction is compared
@@ -532,32 +532,40 @@ def gradient_test(simulation, n=15, diff_type='forward', eps_init=.1):
     theta_init = simulation.theta_init
     D = simulation.Dj
 
-    epsilons = [eps_init * 2**-k for k in range(n)]
+    epsilons = []
     deltas = []
 
     inner_product = dt * np.sum(D*direction)
     print(f'    inner(Dj,direction) = {inner_product:.8e}')
     print(f'{"epsilon":>20}{"diff":>20}{"delta_abs":>20}{"delta":>20}')
 
-    for eps in epsilons:
-        
-        if diff_type == 'forward':
-            control_ = (simulation.control + eps * direction).clip(0, 1)
-            simulation_ = Simulation(control_, theta_init)
-            diff = (simulation_.J - simulation.J) / eps
+    try:
+        for eps in (eps_init * 2**-k for k in range(iter_max)):
+            if diff_type == 'forward':
+                control_ = (simulation.control + eps * direction).clip(0, 1)
+                simulation_ = Simulation(control_, theta_init)
+                diff = (simulation_.J - simulation.J) / eps
 
-        elif diff_type == 'two_sided':
-            control_ = (control - eps * direction).clip(0, 1)
-            simulation_ = Simulation(control_, theta_init)
-            control__ = (control + eps * direction).clip(0, 1)
-            simulation__ = Simulation(control__, theta_init)
-            diff = (simulation__.J - simulation_.J) / (2 * eps)
-        
-        delta_abs = inner_product - diff
-        delta = delta_abs / inner_product
-        deltas.append(delta)
+            elif diff_type == 'two_sided':
+                control_ = (control - eps * direction).clip(0, 1)
+                simulation_ = Simulation(control_, theta_init)
+                control__ = (control + eps * direction).clip(0, 1)
+                simulation__ = Simulation(control__, theta_init)
+                diff = (simulation__.J - simulation_.J) / (2 * eps)
 
-        print(f'{eps:20.8e}{diff:20.8e}{delta_abs:20.8e}{delta:20.8e}')
+            delta_abs = inner_product - diff
+            delta = delta_abs / inner_product
+            deltas.append(delta)
+            epsilons.append(eps)
+
+            print(f'{eps:20.8e}{diff:20.8e}{delta_abs:20.8e}{delta:20.8e}')
+
+        print('Maximal number of iterations was reached.')
+
+    except KeyboardInterrupt:
+        print('Interrupted by user...')
+
+    print('Terminating.')
 
     return epsilons, deltas
 
