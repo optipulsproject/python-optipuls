@@ -415,14 +415,16 @@ def Dj(evolution_adj, control):
     return Dj
 
 
-def gradient_descent(sim, iter_max=50, tolerance=10**-9):
+def gradient_descent(simulation, iter_max=50, step_init=1, tolerance=10**-9):
     '''Runs the gradient descent procedure.
 
     Parameters:
-        sim: Simulation
+        simulation: Simulation
             Simulation object used as the initial guess.
         iter_max: integer
             The maximal allowed number of major iterations.
+        step_init: float
+            The initial value of the descent step (Dj multiplier).
         tolerance: float
             The gradient descent procedure stops when the gradient norm becomes
             less than tolerance.
@@ -438,34 +440,31 @@ def gradient_descent(sim, iter_max=50, tolerance=10**-9):
         slow_down = False
 
         print('Starting the gradient descent procedure...')
-        descent = [sim]
-        norm_Dj = norm(sim.Dj)
-        s = .5 * norm(sim.control) / norm_Dj
+        descent = [simulation]
+        step = step_init
 
-        print(f'{"i.j " :>6} {"s":>14} {"J":>14} {"norm_Dj":>14}')
-        print(f'{sim.J:36.7e} {norm_Dj:14.7e}')
+        print(f'{"i.j " :>6} {"s":>14} {"J":>14} {"norm(Dj)":>14}')
+        print(f'{simulation.J:36.7e} {simulation.Dj_norm:14.7e}')
 
         for i in range(iter_max):
-            if norm_Dj < tolerance:
-                print(f'norm(Dj) = {norm_Dj:.7e} < tolerance')
+            if simulation.Dj_norm < tolerance:
+                print(f'norm(Dj) = {simulation.Dj_norm:.7e} < tolerance')
                 break
 
             j = 0
             while True:
-                sim_ = sim.descend(s)
-                if sim_.J < sim.J: break
-                print(f'{i:3}.{j:<2} {s:14.7e} {sim_.J:14.7e}  {13*"-"}')
+                simulation_trial = simulation.descend(step)
+                if simulation_trial.J < simulation.J: break
+                print(f'{i:3}.{j:<2} {step:14.7e} '
+                      f'{simulation_trial.J:14.7e}  {13*"-"}')
                 j += 1
-                s /= 2
-                # slow_down = True
+                step /= 2
 
-            sim = sim_
-            norm_Dj = norm(sim.Dj)
-            print(f'{i:3}.{j:<2} {s:14.7e} {sim.J:14.7e} {norm_Dj:14.7e}')
-            descent.append(sim)
-            # if not slow_down:
-            s *= 2
-            # slow_down = False
+            simulation = simulation_trial
+            print(f'{i:3}.{j:<2} {step:14.7e} '
+                  f'{simulation.J:14.7e} {simulation.Dj_norm:14.7e}')
+            descent.append(simulation)
+            step *= 2
 
         else:
             print('Maximal number of iterations was reached.')
