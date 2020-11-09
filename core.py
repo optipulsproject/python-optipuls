@@ -179,6 +179,14 @@ class Simulation():
             return self._Dj
 
     @property
+    def Dj_norm(self):
+        try:
+            return self._Dj_norm
+        except AttributeError:
+            self._Dj_norm = norm(self.Dj)
+            return self._Dj_norm
+
+    @property
     def J(self):
         try:
             return self._J_total
