@@ -30,9 +30,9 @@ implicitness = Constant("1.0")
 
 # Optimization parameters
 alpha = 0. # temporarily exclude the control cost
-beta = 1.
+beta_velocity = 1.
 beta_welding = 1.
-gamma = 10**-5
+beta_liquidity = 1.
 velocity_max = 0.12
 target_point = Point(0, .5*Z)
 threshold_temp = 1102.
@@ -346,13 +346,13 @@ def solve_adjoint(evolution, control):
         theta_km1.vector().set_local(evolution[k-1])
 
         F = a(theta_km1, theta_k, p, Constant(control[k-1]))\
-          + dt * J_expression(theta_km1, theta_k, coefficients, expressions)
+          + dt * J_expression(k-1, theta_km1, theta_k)
 
         if k < Nt:
             # is it correct that the next line can be omitted?
             # theta_next_.vector().set_local(evolution[k+1])
             F += a(theta_k, theta_kp1, p_k, Constant(control[k]))\
-               + dt * J_expression(theta_k, theta_kp1, coefficients, expressions)
+               + dt * J_expression(k, theta_k, theta_kp1)
 
         dF = derivative(F, theta_k, v)
         
@@ -586,30 +586,16 @@ def liquidity(theta, theta_):
     return liquidity_
 
 
-def completenes(theta, theta_):
-    pass
+
+def J_expression(k, theta_k, theta_kp1):
+
+    e = Constant(beta_liquidity) * liquidity(theta_k, theta_kp1)**2 * x[0] * dx\
+      + Constant(beta_velocity) * velocity(theta_k, theta_kp1)**2 * x[0] * dx
+
+    return e
 
 
-expressions = [velocity, liquidity]
-coefficients = [beta, gamma]
-
-def J_expression(theta, theta_, coefficients, expressions):
-    '''Combines multiple penalty terms into single UFL expression.
-
-    The penalty terms are supposed to be control independent.
-    Control effort is not penalized here!
-
-    Usage:
-    J_expression(theta, theta_, [beta, gamma], [velocity, liquidity])
-    J_expression(theta, theta_, coefficients, expressions)
-
-    '''
-
-    return sum(c * e(theta, theta_)**2 * x[0] * dx
-        for c, e in zip(coefficients, expressions))
-
-
-def J_vector(evolution, control, coefficients, expressions):
+def J_vector(evolution, control):
     '''WARNING: control cost is presented here!'''
 
     theta = Function(V)
@@ -621,7 +607,7 @@ def J_vector(evolution, control, coefficients, expressions):
     theta.vector().set_local(evolution[0])
     for k in range(Nt):
         theta_.vector().set_local(evolution[k+1])
-        e = J_expression(theta, theta_, coefficients, expressions)
+        e = J_expression(k, theta, theta_)
         J_vector_[k] = assemble(e)
         theta.assign(theta_)
 
@@ -630,12 +616,10 @@ def J_vector(evolution, control, coefficients, expressions):
     return J_vector_
 
 
-def J_total(evolution, control,
-            coefficients=coefficients,
-            expressions=expressions):
+def J_total(evolution, control):
 
-    J_vector_ = J_vector(evolution, control, coefficients, expressions)
-    return dt * J_vector_.sum()
+    J_vector_ = J_vector(evolution, control)
+    return dt * J_vector_.sum() + J_welding(evolution, control)
 
 
 def J_welding(evolution, control):
@@ -649,4 +633,4 @@ def J_welding(evolution, control):
 
     return result
 
-J = J_welding
+J = J_total
