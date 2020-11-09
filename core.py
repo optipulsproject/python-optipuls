@@ -35,6 +35,7 @@ beta_welding = 1.
 beta_liquidity = 1.
 velocity_max = 0.12
 target_point = Point(0, .5*Z)
+central_point = Point(0, 0)
 threshold_temp = 1102.
 pow_ = 6.
 
@@ -187,6 +188,66 @@ class Simulation():
             return self._Dj_norm
 
     @property
+    def penalty_velocity_vector(self):
+        try:
+            return self._penalty_velocity_vector
+        except AttributeError:
+            self._penalty_velocity_vector = penalty_vector(self.evo, velocity)
+            return self._penalty_velocity_vector
+
+    @property
+    def penalty_velocity_total(self):
+        try:
+            return self._penalty_velocity_total
+        except AttributeError:
+            self._penalty_velocity_total =\
+                    dt * sum(self.penalty_velocity_vector)
+            return self._penalty_velocity_total
+
+    @property
+    def penalty_liquidity_vector(self):
+        try:
+            return self._penalty_liquidity_vector
+        except AttributeError:
+            self._penalty_liquidity_vector = penalty_vector(self.evo, liquidity)
+            return self._penalty_liquidity_vector
+
+    @property
+    def penalty_liquidity_total(self):
+        try:
+            return self._penalty_liquidity_total
+        except AttributeError:
+            self._penalty_liquidity_total =\
+                    dt * sum(self.penalty_liquidity_vector)
+            return self._penalty_liquidity_total
+
+    @property
+    def penalty_welding_total(self):
+        try:
+            return self._penalty_welding_total
+        except AttributeError:
+            self._penalty_welding_total = J_welding(self.evo, self.control)
+            return self._penalty_welding_total
+
+    @property
+    def temp_target_point_vector(self):
+        try:
+            return self._temp_target_point_vector
+        except AttributeError:
+            self._temp_target_point_vector = \
+                    temp_at_point_vector(self.evo, target_point)
+            return self._temp_target_point_vector
+
+    @property
+    def temp_central_point_vector(self):
+        try:
+            return self._temp_central_point_vector
+        except AttributeError:
+            self._temp_central_point_vector = \
+                    temp_at_point_vector(self.evo, central_point)
+            return self._temp_central_point_vector
+
+    @property
     def J(self):
         try:
             return self._J_total
@@ -194,10 +255,10 @@ class Simulation():
             self._J_total = J(self.evo, self.control)
             return self._J_total
 
-    def descend(self, s):
-        control_ = (self.control - s*self.Dj).clip(0, 1)
-        simulation_ = Simulation(control_, self.theta_init)
-        return simulation_
+    def descend(self, step):
+        control_next = (self.control - step * self.Dj).clip(0, 1)
+        simulation_next = Simulation(control_next, self.theta_init)
+        return simulation_next
 
 
 with open('material.json') as file:
@@ -649,3 +710,30 @@ def J_welding(evolution, control):
     return result
 
 J = J_total
+
+
+def penalty_vector(evo, penalty_term):
+    theta_k = Function(V)
+    theta_kp1 = Function(V)
+
+    Nt = len(evo) - 1
+    vector = np.zeros(Nt)
+
+    theta_k.vector().set_local(evo[0])
+    for k in range(Nt):
+        theta_kp1.vector().set_local(evo[k+1])
+        expression = penalty_term(theta_k, theta_kp1)**2 * x[0] * dx
+        vector[k] = assemble(expression)
+        theta_k.assign(theta_kp1)
+
+    return vector
+
+
+def temp_at_point_vector(evo, point):
+    theta_k = Function(V)
+    vector = np.zeros(Nt+1)
+    for k in range(Nt+1):
+        theta_k.vector().set_local(evo[k])
+        vector[k] = theta_k(point)
+
+    return vector
