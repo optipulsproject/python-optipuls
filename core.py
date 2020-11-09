@@ -592,13 +592,13 @@ def velocity(theta, theta_, velocity_max=velocity_max):
     return velocity_
 
 
-def liquidity(theta, theta_):
-    theta_m = implicitness*theta_ + (1-implicitness)*theta
+def liquidity(theta_k, theta_kp1):
+    theta_avg = implicitness * theta_kp1 + (1 - implicitness) * theta_k
 
-    liquidity_ = theta_m - Constant(solidus)
-    liquidity_ *= conditional(ge(liquidity_, 0.), 1., 0.)
+    expression = theta_avg - Constant(solidus)
+    expression *= conditional(ge(expression, 0.), 1., 0.)
 
-    return liquidity_
+    return expression
 
 
 
