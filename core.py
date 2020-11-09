@@ -577,19 +577,19 @@ def gradient_test(simulation, iter_max=15, eps_init=.1, diff_type='forward'):
     return epsilons, deltas
 
 
-def velocity(theta, theta_, velocity_max=velocity_max):
-    theta_m = implicitness*theta_ + (1-implicitness)*theta
-    grad_norm = sqrt(inner(grad(theta_m), grad(theta_m)) + DOLFIN_EPS)
+def velocity(theta_k, theta_kp1, velocity_max=velocity_max):
+    theta_avg = implicitness * theta_kp1 + (1 - implicitness) * theta_k
+    grad_norm = sqrt(inner(grad(theta_avg), grad(theta_avg)) + DOLFIN_EPS)
 
-    velocity_ = (theta_ - theta) / dt\
-        / grad_norm\
-        * conditional(ufl.And(ge(theta,solidus), lt(theta_,liquidus)), 1., 0.)
+    expression = (theta_kp1 - theta_k) / dt / grad_norm
 
-    velocity_ *= conditional(le(velocity_, 0.), 1., 0.)
-    velocity_ *= conditional(ge(-velocity_, velocity_max), 1., 0.)
-    velocity_ *= -1
+    expression *= conditional(
+            ufl.And(ge(theta_k, solidus), lt(theta_kp1, liquidus)), 1., 0.)
+    expression *= conditional(le(expression, 0.), 1., 0.)
+    expression *= conditional(ge(-expression, velocity_max), 1., 0.)
+    expression *= -1
 
-    return velocity_
+    return expression
 
 
 def liquidity(theta_k, theta_kp1):
