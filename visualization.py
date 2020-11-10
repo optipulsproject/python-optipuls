@@ -138,3 +138,38 @@ def size_plot(time_space, r_sol, r_liq, d_sol, d_liq, sigma=3, scale=2000):
 
     fig.subplots_adjust(hspace=0)
     plt.show()
+
+
+def temperature_plot(timeline, *temperatures, labels=None, outfile=None,
+                     hbars=None, **kwargs):
+    
+    fig, ax = plt.subplots()
+    fig.set_size_inches(12,8)
+
+    ax.set_title('temperatures')
+    ax.set_xticks(timeline)
+    ax.set_ylim(0, 2000)
+
+    # set dummy labels if they are not present
+    if not labels:
+        labels = ['temperature ' + str(i+1) for i in range(len(temperatures))]
+
+    for temp, label in zip(temperatures, labels):
+        ax.plot(timeline, temp, zorder=0, label=label)
+        ax.scatter(timeline, temp, color='red', marker='x', zorder=1)
+
+    if hbars is not None:
+        for hbar in hbars:
+            ax.axhline(hbar)
+
+    ax.legend(loc=2)
+
+    plt.tight_layout()
+    if not outfile:
+        plt.show(**kwargs)
+    else:
+        plt.savefig(outfile, **kwargs)
+
+
+
+
