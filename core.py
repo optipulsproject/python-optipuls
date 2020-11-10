@@ -124,7 +124,7 @@ class Simulation():
     '''Caches the computation results and keeps related values together.'''
 
     def __init__(self, control, theta_init=project(theta_amb, V)):
-        self.control = control
+        self._control = control
         self._theta_init = theta_init
 
     @property
@@ -133,16 +133,9 @@ class Simulation():
 
     @control.setter
     def control(self, control_):
-        if not isinstance(control_, np.ndarray):
-            raise TypeError('not a np.ndarray')
-        if not control_.dtype == np.float64:
-            raise TypeError('the type is not np.float64')
-        if not control_.shape == (Nt,):
-            raise ValueError('dimension inconsistency')
-        if not np.array_equal(control_, control_.clip(0, 1)):
-            raise ValueError('infeasible value')
-
-        self._control = control_
+        raise AttributeError(
+            'Assigning a new control in an existing simulation object is '
+            'forbidden for safety reasons. Create a new object instead.')
 
     @property
     def theta_init(self):
