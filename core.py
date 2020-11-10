@@ -653,7 +653,25 @@ def velocity(theta_k, theta_kp1, velocity_max=velocity_max):
     return expression
 
 
-def liquidity(theta_k, theta_kp1):
+def liquidity(theta_k, theta_kp1, implicitness=implicitness):
+    '''Returns the "liquidity" penalty expression.
+
+    Parameters:
+        theta_k: Function(V)
+            Function representing the state from the current time slice.
+        theta_kp1: Function(V)
+            Function representing the state from the next time slice.
+        implicitness: float
+            The weight of theta_kp1 in the expression. The global implicitness
+            parameter is used by default.
+
+    Returns:
+        expression: FEniCS expression
+            The expression for the adjoint equation.
+
+
+    '''
+    
     theta_avg = implicitness * theta_kp1 + (1 - implicitness) * theta_k
 
     expression = theta_avg - Constant(solidus)
