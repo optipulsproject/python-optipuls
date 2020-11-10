@@ -332,21 +332,28 @@ def solve_forward(control, theta_init=project(theta_amb, V)):
             
     '''
 
-    theta = Function(V)
-    theta_ = Function(V)
-    v = TestFunction(V)
+    # initialize state functions
+    theta_k = Function(V)    # stands for theta[k]
+    theta_kp1 = Function(V)  # stands for theta[k+1]
 
-    theta.assign(theta_init)
+    # FEM equation setup
+    v = TestFunction(V)
 
     Nt = len(control)
     evolution = np.zeros((Nt+1, len(V.dofmap().dofs())))
-    evolution[0,:] = theta.vector().get_local()
 
+    # preparing for the first iteration
+    theta_k.assign(theta_init)
+    evolution[0] = theta_k.vector().get_local()
+
+    # solve forward, i.e. theta_k -> theta p_kp1, k = 0, 1, 2, ..., Nt-1
     for k in range(Nt):
-        F = a(theta, theta_, v, Constant(control[k]))
-        solve(F == 0, theta_)
-        evolution[k+1,:] = theta_.vector().get_local()
-        theta.assign(theta_)
+        F = a(theta_k, theta_kp1, v, Constant(control[k]))
+        solve(F == 0, theta_kp1)
+        evolution[k+1] = theta_kp1.vector().get_local()
+
+        # preparing for the next iteration
+        theta_k.assign(theta_kp1)
 
     return evolution
 
