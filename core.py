@@ -41,7 +41,7 @@ beta_liquidity = 1.
 velocity_max = 0.12
 target_point = dolfin.Point(0, .5*Z)
 central_point = dolfin.Point(0, 0)
-threshold_temp = 1102.
+threshold_temp = 1500.
 pow_ = 6.
 
 control_ref = np.zeros(Nt)
@@ -123,6 +123,10 @@ sym_axis_boundary = SymAxisBoundary()
 sym_axis_boundary.mark(boundary_markers, 3)
 
 ds = dolfin.Measure('ds', domain=mesh, subdomain_data=boundary_markers)
+
+
+class DescendLoopException(Exception):
+    pass
 
 
 class Simulation():
@@ -252,11 +256,6 @@ class Simulation():
         except AttributeError:
             self._J_total = J(self.evo, self.control)
             return self._J_total
-
-    def descend(self, step):
-        control_next = (self.control - step * self.Dj).clip(0, 1)
-        simulation_next = Simulation(control_next, self.theta_init)
-        return simulation_next
 
 
 with open('material.json') as file:
@@ -522,7 +521,13 @@ def gradient_descent(simulation, iter_max=50, step_init=1, tolerance=10**-9):
 
             j = 0
             while True:
-                simulation_trial = simulation.descend(step)
+                control_trial = (
+                    simulation.control - step * simulation.Dj).clip(0, 1)
+                if np.allclose(control_trial, simulation.control):
+                    raise DescendLoopException
+                simulation_trial = Simulation(
+                    control_trial, simulation.theta_init)
+
                 if simulation_trial.J < simulation.J: break
                 print(f'{i:3}.{j:<2} {step:14.7e} '
                       f'{simulation_trial.J:14.7e}  {13*"-"}')
@@ -540,6 +545,10 @@ def gradient_descent(simulation, iter_max=50, step_init=1, tolerance=10**-9):
 
     except KeyboardInterrupt:
         print('Interrupted by user...')
+    except DescendLoopException:
+        print('The descend procedure has looped since control reached '
+              'the boundary of the feasible set:\n'
+              'project(control_next) == control_current.')
 
     print('Terminating.')
 
