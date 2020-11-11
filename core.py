@@ -21,12 +21,16 @@ T, Nt = 0.010, 30
 dt = T/Nt
 
 # Model constants
-theta_amb = Constant("295")
-enthalpy = Constant("397000")
+temp_amb = 295.
+# enthalpy = Constant("397000")
 P_YAG = 1600.
 absorb = 0.135
 laser_pd = (absorb * P_YAG) / (pi * R_laser**2)
-implicitness = Constant("1.0")
+implicitness = 1.
+
+convection_coeff = 20.
+radiation_coeff = 2.26 * 10**-9
+
 
 # Optimization parameters
 alpha = 0. # temporarily exclude the control cost
@@ -123,7 +127,7 @@ ds = Measure('ds', domain=mesh, subdomain_data=boundary_markers)
 class Simulation():
     '''Caches the computation results and keeps related values together.'''
 
-    def __init__(self, control, theta_init=project(theta_amb, V)):
+    def __init__(self, control, theta_init=project(temp_amb, V)):
         self._control = control
         self._theta_init = theta_init
 
@@ -290,13 +294,13 @@ def s(theta):
     return c(theta) * rho(theta)
 
 
-def laser_bc(intensity):
-    return laser_pd * intensity
+def laser_bc(control_k):
+    return laser_pd * Constant(control_k)
 
 
 def cooling_bc(theta):
-    return - 20 * (theta-theta_amb)\
-           - 2.26 * 10**(-9) * (theta**4-theta_amb**4)
+    return - convection_coeff * (theta - temp_amb)\
+           - radiation_coeff * (theta**4 - temp_amb**4)
 
 
 def norm(vector):
@@ -317,7 +321,7 @@ def a(u_k, u_kp1, v, control_k):
 
     return a_
 
-def solve_forward(control, theta_init=project(theta_amb, V)):
+def solve_forward(control, theta_init=project(temp_amb, V)):
     '''Calculates the solution to the forward problem with the given control.
 
     For further details, see `indexing diagram`.
