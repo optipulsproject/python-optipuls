@@ -1,7 +1,13 @@
-from core import *
 import argparse
-from visualization import gradient_test_plot, objective_plot, control_plot
 
+import dolfin
+import numpy as np
+
+import core
+import visualization as vis
+
+
+# parse command line arguments
 parser = argparse.ArgumentParser()
 parser.add_argument('-o', '--output', default='../output')
 parser.add_argument('-s', '--scratch', default='/scratch/OptiPuls/current')
@@ -14,18 +20,17 @@ args = parser.parse_args()
 
 # load the saved state
 theta_hot_np = np.load(args.scratch+'/theta_hot.npy')
-theta_hot = Function(V)
+theta_hot = dolfin.Function(core.V)
 theta_hot.vector().set_local(theta_hot_np)
 
+time_space = np.linspace(0, core.T, num=core.Nt, endpoint=True)
 
-time_space = np.linspace(0, T, num=Nt, endpoint=True)
-
-control = .25 * np.sin(time_space*np.pi / (2*T)) + .5
+control = .25 * np.sin(time_space*np.pi / (2*core.T)) + .5
 control[:] = .5
-s = Simulation(control)
-epsilons, deltas_fwd = gradient_test(s, iter_max=15)
-gradient_test_plot(epsilons, deltas_fwd)
-# descent = gradient_descent(s, iter_max=20)
+s = core.Simulation(control)
+epsilons, deltas_fwd = core.gradient_test(s, iter_max=15)
+vis.gradient_test_plot(epsilons, deltas_fwd)
+# descent = core.gradient_descent(s, iter_max=50, step_init=2**-25)
 
 # print("Starting optimization process")
 # control = np.vectorize(u)(time_space, t1=0, t2=0.005)

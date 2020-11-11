@@ -1,17 +1,18 @@
-from dolfin import *
-from mshr import *
-import ufl
-import numpy as np
-from matplotlib import pyplot as plt
-from numpy.polynomial import Polynomial
 import json
 
-# from tqdm import trange
+import dolfin
+from dolfin import dx, Constant, DOLFIN_EPS
+import ufl
+from ufl import inner, grad, conditional, ge, gt, lt, le, And
+import numpy as np
+from numpy.polynomial import Polynomial
+from matplotlib import pyplot as plt
 
 import splines as spl
 
-set_log_level(40)
-parameters["form_compiler"]["quadrature_degree"] = 1
+
+dolfin.set_log_level(40)
+dolfin.parameters["form_compiler"]["quadrature_degree"] = 1
 
 # Space and time discretization parameters
 R = 0.0025
@@ -25,7 +26,7 @@ temp_amb = 295.
 # enthalpy = Constant("397000")
 P_YAG = 1600.
 absorb = 0.135
-laser_pd = (absorb * P_YAG) / (pi * R_laser**2)
+laser_pd = (absorb * P_YAG) / (np.pi * R_laser**2)
 implicitness = 1.
 
 convection_coeff = 20.
@@ -38,8 +39,8 @@ beta_velocity = 1.
 beta_welding = 1.
 beta_liquidity = 1.
 velocity_max = 0.12
-target_point = Point(0, .5*Z)
-central_point = Point(0, 0)
+target_point = dolfin.Point(0, .5*Z)
+central_point = dolfin.Point(0, 0)
 threshold_temp = 1102.
 pow_ = 6.
 
@@ -50,37 +51,37 @@ liquidus = 923.0
 solidus = 858.0
 
 
-class Domain_2(SubDomain):
+class Domain_2(dolfin.SubDomain):
     def inside(self, x, on_boundary):
         return x[0] < 0.6 * R
 
-class Domain_3(SubDomain):
+class Domain_3(dolfin.SubDomain):
     def inside(self, x, on_boundary):
         return x[0] < 0.4 * R
 
-class Domain_4(SubDomain):
+class Domain_4(dolfin.SubDomain):
     def inside(self, x, on_boundary):
         return x[0] < 0.2 * R
 
-class Domain_5(SubDomain):
+class Domain_5(dolfin.SubDomain):
     def inside(self, x, on_boundary):
         return x[0] < 0.2 * R and x[1] > 0.5 * Z
 
-class LaserBoundary(SubDomain):
+class LaserBoundary(dolfin.SubDomain):
     def inside(self, x, on_boundary):
         return on_boundary and x[1] > Z-DOLFIN_EPS and x[0] < R_laser
     
-class EmptyBoundary(SubDomain):
+class EmptyBoundary(dolfin.SubDomain):
     def inside(self, x, on_boundary):
         return on_boundary and \
             ((x[1] > Z-DOLFIN_EPS and x[0] >= R_laser) or x[1] < DOLFIN_EPS)
 
-class SymAxisBoundary(SubDomain):
+class SymAxisBoundary(dolfin.SubDomain):
     def inside(self, x, on_boundary):
         return on_boundary and (x[0] < DOLFIN_EPS)
     
 # Create and refine mesh
-mesh = RectangleMesh(Point(0,0), Point(R,Z), 25, 5)
+mesh = dolfin.RectangleMesh(dolfin.Point(0,0), dolfin.Point(R,Z), 25, 5)
 
 domain_2 = Domain_2()
 domain_3 = Domain_3()
@@ -88,29 +89,29 @@ domain_4 = Domain_4()
 domain_5 = Domain_5()
 # near_laser = NearLaser()
 
-edge_markers = MeshFunction("bool", mesh, mesh.topology().dim()-1)
+edge_markers = dolfin.MeshFunction("bool", mesh, mesh.topology().dim()-1)
 domain_2.mark(edge_markers, True)
-mesh = refine(mesh, edge_markers)
+mesh = dolfin.refine(mesh, edge_markers)
 
-edge_markers = MeshFunction("bool", mesh, mesh.topology().dim()-1)
+edge_markers = dolfin.MeshFunction("bool", mesh, mesh.topology().dim()-1)
 domain_3.mark(edge_markers, True)
-mesh = refine(mesh, edge_markers)
+mesh = dolfin.refine(mesh, edge_markers)
 
-edge_markers = MeshFunction("bool", mesh, mesh.topology().dim()-1)
+edge_markers = dolfin.MeshFunction("bool", mesh, mesh.topology().dim()-1)
 domain_4.mark(edge_markers, True)
-mesh = refine(mesh, edge_markers)
+mesh = dolfin.refine(mesh, edge_markers)
 
-edge_markers = MeshFunction("bool", mesh, mesh.topology().dim()-1)
+edge_markers = dolfin.MeshFunction("bool", mesh, mesh.topology().dim()-1)
 domain_5.mark(edge_markers, True)
-mesh = refine(mesh, edge_markers)
+mesh = dolfin.refine(mesh, edge_markers)
 
-x = SpatialCoordinate(mesh)
+x = dolfin.SpatialCoordinate(mesh)
 
 # Define function space 
-V = FunctionSpace(mesh, "CG", 1)
-V1 = FunctionSpace(mesh, "DG", 0)
+V = dolfin.FunctionSpace(mesh, "CG", 1)
+V1 = dolfin.FunctionSpace(mesh, "DG", 0)
 
-boundary_markers = MeshFunction('size_t', mesh, mesh.topology().dim()-1)
+boundary_markers = dolfin.MeshFunction('size_t', mesh, mesh.topology().dim()-1)
 
 laser_boundary = LaserBoundary()
 laser_boundary.mark(boundary_markers, 1)
@@ -121,13 +122,13 @@ empty_boundary.mark(boundary_markers, 2)
 sym_axis_boundary = SymAxisBoundary()
 sym_axis_boundary.mark(boundary_markers, 3)
 
-ds = Measure('ds', domain=mesh, subdomain_data=boundary_markers)
+ds = dolfin.Measure('ds', domain=mesh, subdomain_data=boundary_markers)
 
 
 class Simulation():
     '''Caches the computation results and keeps related values together.'''
 
-    def __init__(self, control, theta_init=project(temp_amb, V)):
+    def __init__(self, control, theta_init=dolfin.project(temp_amb, V)):
         self._control = control
         self._theta_init = theta_init
 
@@ -286,8 +287,8 @@ kappa_ax = spl.spline_as_ufl(spline,
 
 
 def kappa(theta):
-    return as_matrix([[kappa_rad(theta), Constant("0.0")],
-                      [Constant("0.0"), kappa_ax(theta)]])
+    return dolfin.as_matrix([[kappa_rad(theta), Constant("0.0")],
+                             [Constant("0.0"), kappa_ax(theta)]])
 
 
 def s(theta):
@@ -304,7 +305,7 @@ def cooling_bc(theta):
 
 
 def norm(vector):
-    return sqrt(dt * sum(vector**2))
+    return np.sqrt(dt * sum(vector**2))
 
 
 def avg(u_k, u_kp1, implicitness=implicitness):
@@ -321,7 +322,7 @@ def a(u_k, u_kp1, v, control_k):
 
     return a_
 
-def solve_forward(control, theta_init=project(temp_amb, V)):
+def solve_forward(control, theta_init=dolfin.project(temp_amb, V)):
     '''Calculates the solution to the forward problem with the given control.
 
     For further details, see `indexing diagram`.
@@ -340,11 +341,11 @@ def solve_forward(control, theta_init=project(temp_amb, V)):
     '''
 
     # initialize state functions
-    theta_k = Function(V)    # stands for theta[k]
-    theta_kp1 = Function(V)  # stands for theta[k+1]
+    theta_k = dolfin.Function(V)    # stands for theta[k]
+    theta_kp1 = dolfin.Function(V)  # stands for theta[k+1]
 
     # FEM equation setup
-    v = TestFunction(V)
+    v = dolfin.TestFunction(V)
 
     Nt = len(control)
     evolution = np.zeros((Nt+1, len(V.dofmap().dofs())))
@@ -356,7 +357,7 @@ def solve_forward(control, theta_init=project(temp_amb, V)):
     # solve forward, i.e. theta_k -> theta p_kp1, k = 0, 1, 2, ..., Nt-1
     for k in range(Nt):
         F = a(theta_k, theta_kp1, v, control[k])
-        solve(F == 0, theta_kp1)
+        dolfin.solve(F == 0, theta_kp1)
         evolution[k+1] = theta_kp1.vector().get_local()
 
         # preparing for the next iteration
@@ -390,17 +391,17 @@ def solve_adjoint(evolution, control):
     '''
 
     # initialize state functions
-    theta_km1 = Function(V)  # stands for theta[k-1]
-    theta_k = Function(V)    # stands for theta[k]
-    theta_kp1 = Function(V)  # stands for theta[k+1]
+    theta_km1 = dolfin.Function(V)  # stands for theta[k-1]
+    theta_k = dolfin.Function(V)    # stands for theta[k]
+    theta_kp1 = dolfin.Function(V)  # stands for theta[k+1]
 
     # initialize adjoint state functions
-    p_km1 = Function(V)      # stands for p[k-1]
-    p_k = Function(V)        # stands for p[k]
+    p_km1 = dolfin.Function(V)      # stands for p[k-1]
+    p_k = dolfin.Function(V)        # stands for p[k]
 
     # FEM equation setup
-    p = TrialFunction(V)     # stands for unknown p[k-1]
-    v = TestFunction(V)
+    p = dolfin.TrialFunction(V)     # stands for unknown p[k-1]
+    v = dolfin.TestFunction(V)
 
     Nt = len(control)
     evolution_adj = np.zeros((Nt+1, len(V.dofmap().dofs())))
@@ -430,20 +431,20 @@ def solve_adjoint(evolution, control):
             F += a(theta_k, theta_kp1, p_k, control[k])\
                + dt * J_expression(k, theta_k, theta_kp1)
 
-        dF = derivative(F, theta_k, v)
+        dF = dolfin.derivative(F, theta_k, v)
         
         # sometimes rhs(dF) is void which leads to a ValueError
         try:
-            A, b = assemble_system(lhs(dF), rhs(dF))
+            A, b = dolfin.assemble_system(dolfin.lhs(dF), dolfin.rhs(dF))
         except ValueError:
-            A, b = assemble_system(lhs(dF), Constant(0)*v*dx)
+            A, b = dolfin.assemble_system(dolfin.lhs(dF), Constant(0)*v*dx)
 
         # calculate and apply PointSource total magnitude
         magnitude_2 = theta_k(target_point) ** (pow_-1)
-        ps = PointSource(V, target_point, - magnitude_1 * magnitude_2)
+        ps = dolfin.PointSource(V, target_point, - magnitude_1 * magnitude_2)
         ps.apply(b)
 
-        solve(A, p_km1.vector(), b)
+        dolfin.solve(A, p_km1.vector(), b)
  
         evolution_adj[k-1] = p_km1.vector().get_local()
 
@@ -471,12 +472,12 @@ def Dj(evolution_adj, control):
             The gradient of the cost functional.
     '''
 
-    p = Function(V)
+    p = dolfin.Function(V)
     z = np.zeros(Nt)
 
     for i in range(Nt):
         p.vector().set_local(evolution_adj[i])
-        z[i] = assemble(p * x[0] * ds(1))
+        z[i] = dolfin.assemble(p * x[0] * ds(1))
     
     Dj = alpha * (control-control_ref) - laser_pd*z
 
@@ -647,12 +648,12 @@ def gradient_test(simulation, iter_max=15, eps_init=.1, diff_type='forward'):
 
 def velocity(theta_k, theta_kp1, velocity_max=velocity_max):
     theta_avg = avg(theta_k, theta_kp1)
-    grad_norm = sqrt(inner(grad(theta_avg), grad(theta_avg)) + DOLFIN_EPS)
+    grad_norm = ufl.sqrt(inner(grad(theta_avg), grad(theta_avg)) + DOLFIN_EPS)
 
     expression = (theta_kp1 - theta_k) / dt / grad_norm
 
     expression *= conditional(
-            ufl.And(ge(theta_k, solidus), lt(theta_kp1, liquidus)), 1., 0.)
+            And(ge(theta_k, solidus), lt(theta_kp1, liquidus)), 1., 0.)
     expression *= conditional(le(expression, 0.), 1., 0.)
     expression *= conditional(ge(-expression, velocity_max), 1., 0.)
     expression *= -1
@@ -699,8 +700,8 @@ def J_expression(k, theta_k, theta_kp1):
 def J_vector(evolution, control):
     '''WARNING: control cost is presented here!'''
 
-    theta = Function(V)
-    theta_ = Function(V)
+    theta = dolfin.Function(V)
+    theta_ = dolfin.Function(V)
 
     Nt = len(evolution) - 1
     J_vector_ = np.zeros(Nt)
@@ -709,7 +710,7 @@ def J_vector(evolution, control):
     for k in range(Nt):
         theta_.vector().set_local(evolution[k+1])
         e = J_expression(k, theta, theta_)
-        J_vector_[k] = assemble(e)
+        J_vector_[k] = dolfin.assemble(e)
         theta.assign(theta_)
 
     J_vector_ += .5 * alpha *(control-control_ref)**2
@@ -725,7 +726,7 @@ def J_total(evolution, control):
 
 def J_welding(evolution, control):
     sum_ = 0
-    theta = Function(V)
+    theta = dolfin.Function(V)
     for k in range(1,Nt+1):
         theta.vector().set_local(evolution[k])
         sum_ += np.float_power(theta(target_point), pow_)
@@ -738,8 +739,8 @@ J = J_total
 
 
 def penalty_vector(evo, penalty_term):
-    theta_k = Function(V)
-    theta_kp1 = Function(V)
+    theta_k = dolfin.Function(V)
+    theta_kp1 = dolfin.Function(V)
 
     Nt = len(evo) - 1
     vector = np.zeros(Nt)
@@ -748,14 +749,14 @@ def penalty_vector(evo, penalty_term):
     for k in range(Nt):
         theta_kp1.vector().set_local(evo[k+1])
         expression = penalty_term(theta_k, theta_kp1)**2 * x[0] * dx
-        vector[k] = assemble(expression)
+        vector[k] = dolfin.assemble(expression)
         theta_k.assign(theta_kp1)
 
     return vector
 
 
 def temp_at_point_vector(evo, point):
-    theta_k = Function(V)
+    theta_k = dolfin.Function(V)
     vector = np.zeros(Nt+1)
     for k in range(Nt+1):
         theta_k.vector().set_local(evo[k])
