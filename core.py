@@ -303,16 +303,15 @@ def norm(vector):
     return sqrt(dt * sum(vector**2))
 
 
-def a(u, u_, v, intensity):
+def a(u_k, u_kp1, v, control_k):
+    u_avg = implicitness * u_kp1 + (1 - implicitness) * u_k
 
-    u_m = implicitness * u_ + (1-implicitness) * u
+    a_ = s(u_k) * (u_kp1 - u_k) * v * x[0] * dx\
+      + dt * inner(kappa(u_k) * grad(u_avg), grad(v)) * x[0] * dx\
+      - dt * laser_bc(control_k) * v * x[0] * ds(1)\
+      - dt * cooling_bc(u_avg) * v * x[0] * (ds(1) + ds(2))
 
-    a = s(u) * (u_ - u) * v * x[0] * dx\
-      + dt * inner(kappa(u) * grad(u_m), grad(v)) * x[0] * dx\
-      - dt * laser_bc(intensity) * v * x[0] * ds(1)\
-      - dt * cooling_bc(u_m) * v * x[0] * (ds(1) + ds(2))
-
-    return a
+    return a_
 
 def solve_forward(control, theta_init=project(theta_amb, V)):
     '''Calculates the solution to the forward problem with the given control.
@@ -348,7 +347,7 @@ def solve_forward(control, theta_init=project(theta_amb, V)):
 
     # solve forward, i.e. theta_k -> theta p_kp1, k = 0, 1, 2, ..., Nt-1
     for k in range(Nt):
-        F = a(theta_k, theta_kp1, v, Constant(control[k]))
+        F = a(theta_k, theta_kp1, v, control[k])
         solve(F == 0, theta_kp1)
         evolution[k+1] = theta_kp1.vector().get_local()
 
@@ -414,13 +413,13 @@ def solve_adjoint(evolution, control):
     for k in range(Nt, 0, -1):
         theta_km1.vector().set_local(evolution[k-1])
 
-        F = a(theta_km1, theta_k, p, Constant(control[k-1]))\
+        F = a(theta_km1, theta_k, p, control[k-1])\
           + dt * J_expression(k-1, theta_km1, theta_k)
 
         if k < Nt:
             # is it correct that the next line can be omitted?
             # theta_next_.vector().set_local(evolution[k+1])
-            F += a(theta_k, theta_kp1, p_k, Constant(control[k]))\
+            F += a(theta_k, theta_kp1, p_k, control[k])\
                + dt * J_expression(k, theta_k, theta_kp1)
 
         dF = derivative(F, theta_k, v)
