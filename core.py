@@ -303,8 +303,12 @@ def norm(vector):
     return sqrt(dt * sum(vector**2))
 
 
+def avg(u_k, u_kp1, implicitness=implicitness):
+    return implicitness * u_kp1 + (1 - implicitness) * u_k
+
+
 def a(u_k, u_kp1, v, control_k):
-    u_avg = implicitness * u_kp1 + (1 - implicitness) * u_k
+    u_avg = avg(u_k, u_kp1)
 
     a_ = s(u_k) * (u_kp1 - u_k) * v * x[0] * dx\
       + dt * inner(kappa(u_k) * grad(u_avg), grad(v)) * x[0] * dx\
@@ -638,7 +642,7 @@ def gradient_test(simulation, iter_max=15, eps_init=.1, diff_type='forward'):
 
 
 def velocity(theta_k, theta_kp1, velocity_max=velocity_max):
-    theta_avg = implicitness * theta_kp1 + (1 - implicitness) * theta_k
+    theta_avg = avg(theta_k, theta_kp1)
     grad_norm = sqrt(inner(grad(theta_avg), grad(theta_avg)) + DOLFIN_EPS)
 
     expression = (theta_kp1 - theta_k) / dt / grad_norm
@@ -671,7 +675,7 @@ def liquidity(theta_k, theta_kp1, implicitness=implicitness):
 
     '''
     
-    theta_avg = implicitness * theta_kp1 + (1 - implicitness) * theta_k
+    theta_avg = avg(theta_k, theta_kp1, implicitness)
 
     expression = theta_avg - Constant(solidus)
     expression *= conditional(ge(expression, 0.), 1., 0.)
