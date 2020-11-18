@@ -76,19 +76,12 @@ class HermiteSpline(Spline):
         
         coef_array = np.zeros((len(knots)+1, 4), dtype=float)
 
-        # domain and window together with convert() from numpy.polynomial
-        # are used as a linear mapping t = (x - knot) / (knot_ - knot) 
-        for knot, knot_, p, p_, m, m_, coef in\
-                zip(knots[:-1], knots[1:],
-                    values[:-1], values[1:],
-                    derivatives[:-1], derivatives[1:],
-                    coef_array[1:-1]):
-
-            coef_unscaled = h00*p + h01*p_ + (h10*m + h11*m_) * (knot_ - knot)
-
-            p = Polynomial(coef_unscaled, domain=[knot, knot_], window=[0,1])
-            p = p.convert()
-            coef[:len(p.coef)] = p.coef
+        for i in range(len(knots) - 1):
+            p = hermine_interpolating_polynomial(
+                    [knots[i], knots[i+1]],
+                    [values[i], values[i+1]],
+                    [derivatives[i], derivatives[i+1]])
+            coef_array[i+1, :len(p.coef)] = p.coef
 
         # assigning the left and the right polynomials based on the preferred
         # extrapolation method
@@ -179,3 +172,34 @@ def spline_as_ufl(spline, knots):
         return expression
 
     return ufl_spline
+
+
+def hermine_interpolating_polynomial(knots, values, derivatives):
+    '''Generates Hermite interpolating polynomial.
+
+    Parameters:
+        knots: [float]
+            Two points on the x-axis.
+        values: [float]
+            The desired values at the given points.
+        derivatives: [float]
+            The desired derivatives at the given points.
+
+    Returns:
+        polynomial: Polynomial
+            The generated Hermite interpolating polynomial.
+
+    '''
+
+    x0, x1 = knots
+    p0, p1 = values
+    m0, m1 = derivatives
+
+    coef_unscaled = h00*p0 + h01*p1 + (h10*m0 + h11*m1) * (x1 - x0)
+
+    # domain and window together with convert() from numpy.polynomial
+    # are used as a linear mapping t = (x - knot) / (knot_ - knot) 
+    polynomial = Polynomial(coef_unscaled, domain=[x0, x1], window=[0,1])
+    polynomial = polynomial.convert()
+    
+    return polynomial
