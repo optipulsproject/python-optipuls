@@ -9,7 +9,7 @@ from numpy.polynomial import Polynomial
 from matplotlib import pyplot as plt
 
 import splines as spl
-
+from generate_vhc_spline import vhc_spline
 
 dolfin.set_log_level(40)
 dolfin.parameters["form_compiler"]["quadrature_degree"] = 1
@@ -261,16 +261,16 @@ class Simulation():
 with open('material.json') as file:
     material = json.load(file)
 
-spline = spl.gen_hermite_spline(
-    material['heat capacity']['knots'],
-    material['heat capacity']['values'])
-c = spl.spline_as_ufl(spline, material['heat capacity']['knots'])
+# spline = spl.gen_hermite_spline(
+#     material['heat capacity']['knots'],
+#     material['heat capacity']['values'])
+# c = spl.spline_as_ufl(spline, material['heat capacity']['knots'])
 
-spline = spl.gen_hermite_spline(
-    material['density']['knots'],
-    material['density']['values'],
-    extrapolation='linear')
-rho = spl.spline_as_ufl(spline, material['density']['knots'])
+# spline = spl.gen_hermite_spline(
+#     material['density']['knots'],
+#     material['density']['values'],
+#     extrapolation='linear')
+# rho = spl.spline_as_ufl(spline, material['density']['knots'])
 
 spline = spl.gen_hermite_spline(
     material['thermal conductivity']['radial']['knots'],
@@ -290,8 +290,10 @@ def kappa(theta):
                              [Constant("0.0"), kappa_ax(theta)]])
 
 
-def s(theta):
-    return c(theta) * rho(theta)
+# def s(theta):
+#     return c(theta) * rho(theta)
+
+s = vhc_spline.as_ufl()
 
 
 def laser_bc(control_k):
