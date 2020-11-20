@@ -1,3 +1,4 @@
+from collections import namedtuple
 import json
 
 import dolfin
@@ -43,6 +44,16 @@ target_point = dolfin.Point(0, .5*Z)
 central_point = dolfin.Point(0, 0)
 threshold_temp = 1500.
 pow_ = 6.
+
+OptimizationParameters = namedtuple(
+        'OptimizationParameters',
+        [
+            'beta_welding',
+            'threshold_temp',
+            'target_point',
+            'pow_',
+            'penalty_expression',
+        ])
 
 control_ref = np.zeros(Nt)
 
@@ -170,7 +181,7 @@ class Simulation():
         try:
             return self._evo_adj
         except AttributeError:
-            self._evo_adj = solve_adjoint(self.evo, self.control)
+            self._evo_adj = solve_adjoint(V, self.evo, self.control, opts)
             return self._evo_adj
 
     @property
@@ -371,25 +382,27 @@ def solve_forward(V, theta_init, control):
     return evolution
 
 
-def solve_adjoint(evolution, control):
+def solve_adjoint(V, evo, control, opts):
     '''Calculates the solution to the adjoint problem.
 
     The solution to the adjoint equation is calculated using the explicitly
     given evolution (solution to the forward problem) and the control.
-    The objective function is provided implicitly and represented in the adjoint
-    solver by penalty_expression.
 
     For better understanding of the indeces see docs/indexing-diagram.txt.
 
     Parameters:
-        evolution: ndarray
+        V: dolfin.FunctionSpace
+            The FEM space of the problem being solved.
+        evo: ndarray
             The coefficients of the solution to the corresponding forward
             problem in the basis of the space V (see solve_forward).
         control: ndarray
-            The laser power profile. 
+            The laser power profile.
+        opts: object
+            Contains optimization parameters required in the adjoint_equation.
 
     Returns:
-        evolution_adj: ndarray
+        evo_adj: ndarray
             The coefficients of the calculated adjoint solution in the basis of
             the space V.
             
@@ -409,32 +422,32 @@ def solve_adjoint(evolution, control):
     v = dolfin.TestFunction(V)
 
     Nt = len(control)
-    evolution_adj = np.zeros((Nt+1, len(V.dofmap().dofs())))
+    evo_adj = np.zeros((Nt+1, len(V.dofmap().dofs())))
 
-    # PointSource magnitute precalculation
+    # PointSource's magnitute precalculation
     sum_ = 0
     for k in range(1, Nt+1):
-        theta_k.vector().set_local(evolution[k])
-        sum_ += theta_k(target_point) ** pow_
-    p_norm = sum_ ** (1 / pow_)
-    magnitude_1 = beta_welding * (p_norm - threshold_temp) * sum_ ** (1/pow_ - 1)
+        theta_k.vector().set_local(evo[k])
+        sum_ += theta_k(opts.target_point) ** opts.pow_
+    p_norm = sum_ ** (1 / opts.pow_)
+    magnitude_pre = opts.beta_welding * (p_norm - opts.threshold_temp)\
+                  * sum_ ** (1/opts.pow_ - 1)
 
     # preparing for the first iteration
-    # p[Nt] is never used so does not need initialization
-    theta_k.vector().set_local(evolution[Nt])
+    # p[Nt] is never used so does not need to be initialized
+    # the next line is for readability, can be omitted for performance
+    theta_k.vector().set_local(evo[Nt])
 
     # solve backward, i.e. p_k -> p = p_km1, k = Nt, Nt-1, Nt-2, ..., 1
     for k in range(Nt, 0, -1):
-        theta_km1.vector().set_local(evolution[k-1])
+        theta_km1.vector().set_local(evo[k-1])
 
         F = a(theta_km1, theta_k, p, control[k-1])\
-          + dt * J_expression(k-1, theta_km1, theta_k)
+          + dt * opts.penalty_expression(k-1, theta_km1, theta_k)
 
         if k < Nt:
-            # is it correct that the next line can be omitted?
-            # theta_next_.vector().set_local(evolution[k+1])
             F += a(theta_k, theta_kp1, p_k, control[k])\
-               + dt * J_expression(k, theta_k, theta_kp1)
+               + dt * opts.penalty_expression(k, theta_k, theta_kp1)
 
         dF = dolfin.derivative(F, theta_k, v)
         
@@ -444,21 +457,22 @@ def solve_adjoint(evolution, control):
         except ValueError:
             A, b = dolfin.assemble_system(dolfin.lhs(dF), Constant(0)*v*dx)
 
-        # calculate and apply PointSource total magnitude
-        magnitude_2 = theta_k(target_point) ** (pow_-1)
-        ps = dolfin.PointSource(V, target_point, - magnitude_1 * magnitude_2)
-        ps.apply(b)
+        # calculate total magnitude and apply PointSource
+        magnitude = - magnitude_pre\
+                  * theta_k(opts.target_point) ** (opts.pow_ - 1)
+        point_source = dolfin.PointSource(V, opts.target_point, magnitude)
+        point_source.apply(b)
 
         dolfin.solve(A, p_km1.vector(), b)
  
-        evolution_adj[k-1] = p_km1.vector().get_local()
+        evo_adj[k-1] = p_km1.vector().get_local()
 
         # preparing for the next iteration
         p_k.assign(p_km1)
         theta_kp1.assign(theta_k)
         theta_k.assign(theta_km1)
 
-    return evolution_adj
+    return evo_adj
 
 
 def Dj(evolution_adj, control):
@@ -778,3 +792,10 @@ def temp_at_point_vector(evo, point):
         vector[k] = theta_k(point)
 
     return vector
+
+opts = OptimizationParameters(
+        beta_welding=beta_welding,
+        threshold_temp=threshold_temp,
+        target_point=target_point,
+        pow_=pow_,
+        penalty_expression=J_expression)
