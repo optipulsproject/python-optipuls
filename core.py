@@ -162,7 +162,7 @@ class Simulation():
         try:
             return self._evo
         except AttributeError:
-            self._evo = solve_forward(self.control, self.theta_init)
+            self._evo = solve_forward(V, self.theta_init, self.control)
             return self._evo
 
     @property
@@ -321,21 +321,27 @@ def a(u_k, u_kp1, v, control_k):
 
     return a_
 
-def solve_forward(control, theta_init=dolfin.project(temp_amb, V)):
+def solve_forward(V, theta_init, control):
     '''Calculates the solution to the forward problem with the given control.
 
-    For further details, see `indexing diagram`.
+    This is a low level function, which is normally not supposed to be used
+    directly by the end user. High level interfaces such as Simulation.evo must
+    be used instead.
+
+    For further details, see the indexing diagram.
 
     Parameters:
+        V: dolfin.FunctionSpace
+            The FEM space of the problem being solved.
+        theta_init: dolfin.Function(V)
+            The initial state.
         control: ndarray
             The laser power coefficient for every time step. 
-        theta_init: Function(V)
-            The initial state of the temperature.
 
     Returns:
         evolution: ndarray
             The coefficients of the calculated solution in the basis of
-            the space V at each time step including the initial state.
+            the space V at each time step including the given initial state.
             
     '''
 
