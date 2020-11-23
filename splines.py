@@ -61,6 +61,9 @@ class Spline:
             return expression
         return ufl_spline
 
+    def dump(self, filename='spline.npz'):
+        np.savez(filename, knots=self.knots, coef_array=self.coef_array)
+
 
 class HermiteSpline(Spline):
     # https://en.wikipedia.org/wiki/Cubic_Hermite_spline
@@ -203,3 +206,8 @@ def hermine_interpolating_polynomial(knots, values, derivatives):
     polynomial = polynomial.convert()
     
     return polynomial
+
+
+def load(filename='spline.npz'):
+    npz_obj = np.load(filename)
+    return Spline(npz_obj['knots'], npz_obj['coef_array'])
