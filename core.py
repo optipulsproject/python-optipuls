@@ -53,6 +53,7 @@ OptimizationParameters = namedtuple(
             'target_point',
             'pow_',
             'penalty_expression',
+            'implicitness',
         ])
 
 control_ref = np.zeros(Nt)
@@ -118,9 +119,6 @@ mesh = dolfin.refine(mesh, edge_markers)
 
 x = dolfin.SpatialCoordinate(mesh)
 
-# Define function space 
-V = dolfin.FunctionSpace(mesh, "CG", 1)
-V1 = dolfin.FunctionSpace(mesh, "DG", 0)
 
 boundary_markers = dolfin.MeshFunction('size_t', mesh, mesh.topology().dim()-1)
 
@@ -143,9 +141,13 @@ class DescendLoopException(Exception):
 class Simulation():
     '''Caches the computation results and keeps related values together.'''
 
-    def __init__(self, control, theta_init=dolfin.project(temp_amb, V)):
+    def __init__(self, problem, control):
+        self._problem = problem
         self._control = control
-        self._theta_init = theta_init
+
+    @property
+    def problem(self):
+        return self._problem
 
     @property
     def control(self):
@@ -158,22 +160,12 @@ class Simulation():
             'forbidden for safety reasons. Create a new object instead.')
 
     @property
-    def theta_init(self):
-        return self._theta_init
-
-    @theta_init.setter
-    def theta_init(self, theta_init_):
-        if not isinstance(theta_init_, Function):
-            raise TypeError('the type is not a Function')
-
-        self._theta_init = theta_init_
-
-    @property
     def evo(self):
         try:
             return self._evo
         except AttributeError:
-            self._evo = solve_forward(V, self.theta_init, self.control)
+            self._evo = solve_forward(
+                    self.problem.V, self.problem.theta_init, self.control)
             return self._evo
 
     @property
@@ -181,7 +173,8 @@ class Simulation():
         try:
             return self._evo_adj
         except AttributeError:
-            self._evo_adj = solve_adjoint(V, self.evo, self.control, opts)
+            self._evo_adj = solve_adjoint(
+                    self.problem.V, self.evo, self.control, self.problem.opts)
             return self._evo_adj
 
     @property
@@ -189,7 +182,7 @@ class Simulation():
         try:
             return self._Dj
         except AttributeError:
-            self._Dj = Dj(self.evo_adj, self.control)
+            self._Dj = Dj(self.problem.V, self.evo_adj, self.control)
             return self._Dj
 
     @property
@@ -265,7 +258,7 @@ class Simulation():
         try:
             return self._J_total
         except AttributeError:
-            self._J_total = J(self.evo, self.control)
+            self._J_total = J(self.problem.V, self.evo, self.control)
             return self._J_total
 
 
@@ -475,13 +468,13 @@ def solve_adjoint(V, evo, control, opts):
     return evo_adj
 
 
-def Dj(evolution_adj, control):
+def Dj(V, evo_adj, control):
     '''Calculates the gradient of the cost functional for the given control.
 
     For further details, see `indexing diagram`.
 
     Parameters:
-        evolution_adj: ndarray
+        evo_adj: ndarray
             The evolution in time of the adjoint state.
         control: ndarray
             The laser power coefficient for every time step. 
@@ -495,7 +488,7 @@ def Dj(evolution_adj, control):
     z = np.zeros(Nt)
 
     for i in range(Nt):
-        p.vector().set_local(evolution_adj[i])
+        p.vector().set_local(evo_adj[i])
         z[i] = dolfin.assemble(p * x[0] * ds(1))
     
     Dj = alpha * (control-control_ref) - laser_pd*z
@@ -530,6 +523,7 @@ def gradient_descent(simulation, iter_max=50, step_init=1, tolerance=10**-9):
         print('Starting the gradient descent procedure...')
         descent = [simulation]
         step = step_init
+        problem = simulation.problem
 
         print(f'{"i.j " :>6} {"s":>14} {"J":>14} {"norm(Dj)":>14}')
         print(f'{simulation.J:36.7e} {simulation.Dj_norm:14.7e}')
@@ -545,8 +539,7 @@ def gradient_descent(simulation, iter_max=50, step_init=1, tolerance=10**-9):
                     simulation.control - step * simulation.Dj).clip(0, 1)
                 if np.allclose(control_trial, simulation.control):
                     raise DescendLoopException
-                simulation_trial = Simulation(
-                    control_trial, simulation.theta_init)
+                simulation_trial = Simulation(problem, control_trial)
 
                 if simulation_trial.J < simulation.J: break
                 print(f'{i:3}.{j:<2} {step:14.7e} '
@@ -634,7 +627,7 @@ def gradient_test(simulation, iter_max=15, eps_init=.1, diff_type='forward'):
     direction /= norm(direction)
     direction *= .0005 * T
 
-    theta_init = simulation.theta_init
+    problem = simulation.problem
     D = simulation.Dj
 
     epsilons = []
@@ -648,14 +641,14 @@ def gradient_test(simulation, iter_max=15, eps_init=.1, diff_type='forward'):
         for eps in (eps_init * 2**-k for k in range(iter_max)):
             if diff_type == 'forward':
                 control_ = (simulation.control + eps * direction).clip(0, 1)
-                simulation_ = Simulation(control_, theta_init)
+                simulation_ = Simulation(problem, control_)
                 diff = (simulation_.J - simulation.J) / eps
 
             elif diff_type == 'two_sided':
                 control_ = (control - eps * direction).clip(0, 1)
-                simulation_ = Simulation(control_, theta_init)
+                simulation_ = Simulation(problem, control_)
                 control__ = (control + eps * direction).clip(0, 1)
-                simulation__ = Simulation(control__, theta_init)
+                simulation__ = Simulation(problem, control__)
                 diff = (simulation__.J - simulation_.J) / (2 * eps)
 
             delta_abs = inner_product - diff
@@ -726,7 +719,7 @@ def J_expression(k, theta_k, theta_kp1):
     return e
 
 
-def J_vector(evolution, control):
+def J_vector(V, evolution, control):
     '''WARNING: control cost is presented here!'''
 
     theta = dolfin.Function(V)
@@ -747,16 +740,16 @@ def J_vector(evolution, control):
     return J_vector_
 
 
-def J_total(evolution, control):
+def J_total(V, evolution, control):
 
-    J_vector_ = J_vector(evolution, control)
-    return dt * J_vector_.sum() + J_welding(evolution, control)
+    J_vector_ = J_vector(V, evolution, control)
+    return dt * J_vector_.sum() + J_welding(V, evolution, control)
 
 
-def J_welding(evolution, control):
+def J_welding(V, evolution, control):
     sum_ = 0
     theta = dolfin.Function(V)
-    for k in range(1,Nt+1):
+    for k in range(1, Nt+1):
         theta.vector().set_local(evolution[k])
         sum_ += np.float_power(theta(target_point), pow_)
     norm = np.float_power(sum_, 1/pow_)
@@ -793,9 +786,14 @@ def temp_at_point_vector(evo, point):
 
     return vector
 
-opts = OptimizationParameters(
-        beta_welding=beta_welding,
-        threshold_temp=threshold_temp,
-        target_point=target_point,
-        pow_=pow_,
-        penalty_expression=J_expression)
+
+class Problem:
+    def __init__(self):
+        pass
+
+    # facade
+    def solve_forward(self, control):
+        return solve_forward(self.V, self.theta_init, control)
+
+# Simulation:
+# self.problem.solve_forward(self.control)
