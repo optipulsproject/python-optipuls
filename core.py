@@ -9,6 +9,7 @@ from numpy.polynomial import Polynomial
 from matplotlib import pyplot as plt
 
 import splines as spl
+from coefficients import vhc, kappa_rad, kappa_ax
 
 
 dolfin.set_log_level(40)
@@ -258,40 +259,12 @@ class Simulation():
             return self._J_total
 
 
-with open('material.json') as file:
-    material = json.load(file)
 
-spline = spl.gen_hermite_spline(
-    material['heat capacity']['knots'],
-    material['heat capacity']['values'])
-c = spl.spline_as_ufl(spline, material['heat capacity']['knots'])
-
-spline = spl.gen_hermite_spline(
-    material['density']['knots'],
-    material['density']['values'],
-    extrapolation='linear')
-rho = spl.spline_as_ufl(spline, material['density']['knots'])
-
-spline = spl.gen_hermite_spline(
-    material['thermal conductivity']['radial']['knots'],
-    material['thermal conductivity']['radial']['values'])
-kappa_rad = spl.spline_as_ufl(spline,
-                material['thermal conductivity']['radial']['knots'])
-
-spline = spl.gen_hermite_spline(
-    material['thermal conductivity']['axial']['knots'],
-    material['thermal conductivity']['axial']['values'])
-kappa_ax = spl.spline_as_ufl(spline,
-                material['thermal conductivity']['axial']['knots'])
-
+s = vhc
 
 def kappa(theta):
     return dolfin.as_matrix([[kappa_rad(theta), Constant("0.0")],
                              [Constant("0.0"), kappa_ax(theta)]])
-
-
-def s(theta):
-    return c(theta) * rho(theta)
 
 
 def laser_bc(control_k):
@@ -320,6 +293,7 @@ def a(u_k, u_kp1, v, control_k):
       - dt * cooling_bc(u_avg) * v * x[0] * (ds(1) + ds(2))
 
     return a_
+
 
 def solve_forward(control, theta_init=dolfin.project(temp_amb, V)):
     '''Calculates the solution to the forward problem with the given control.
@@ -772,3 +746,13 @@ def temp_at_point_vector(evo, point):
         vector[k] = theta_k(point)
 
     return vector
+
+
+class Problem: pass
+
+problem = Problem
+problem.V = V
+
+vhc.problem = problem
+kappa_ax.problem = problem
+kappa_rad.problem = problem
