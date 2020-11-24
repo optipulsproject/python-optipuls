@@ -1,20 +1,40 @@
+import numbers
+
 import numpy as np
 from numpy.polynomial import Polynomial
 from ufl import ge, gt, lt, le, And
 import ufl
 import dolfin
 
-import numbers
 
-
-
-p0 = h00 = np.array([1, 0, -3,  2])  # 1 - 3*x^2 + 2*x^3
-m0 = h10 = np.array([0, 1, -2,  1])  # x - 2*x^2 + x^3
-p1 = h01 = np.array([0, 0,  3, -2])  # 3*x^2 - 2*x^3
-m1 = h11 = np.array([0, 0, -1,  1])  # - *x^2 + x^3
+# Hermite basis polynomials
+h00 = np.array([1, 0, -3,  2])  # 1 - 3*x^2 + 2*x^3
+h10 = np.array([0, 1, -2,  1])  # x - 2*x^2 + x^3
+h01 = np.array([0, 0,  3, -2])  # 3*x^2 - 2*x^3
+h11 = np.array([0, 0, -1,  1])  # - *x^2 + x^3
 
 
 class Spline:
+    '''A class for splines difened on the whole real line.
+
+            x[0]       x[1]       x[2]      x[n-1]
+    ----------+----------+----------+- - - - -+----------
+      pol[0]     pol[1]     pol[2]               pol[n]
+
+
+    Attributes:
+        knots: [float]
+            [x[0], x[1], ..., x[n-1]]
+        coef_array: [[float]]
+            [
+                pol[0].coef,
+                pol[1].coef,
+                ...
+                po[n].coef
+            ]
+
+    '''
+
     def __init__(self, knots, coef_array):
         if not np.all(knots[:-1] <= knots[1:]):
             raise ValueError('knots are not sorted')
@@ -26,12 +46,12 @@ class Spline:
 
     def __call__(self, x):
         if isinstance(x, numbers.Number):
-            for (knot, coefficients) in zip(self.knots, self.coef_array):
+            for (knot, coef) in zip(self.knots, self.coef_array):
                 if x < knot:
-                    return Polynomial(coefficients)(x)
+                    return Polynomial(coef)(x)
             else:
-                coefficients = self.coef_array[-1]
-                return Polynomial(coefficients)(x)
+                coef = self.coef_array[-1]
+                return Polynomial(coef)(x)
         elif isinstance(x, dolfin.function.function.Function):
             ufl_form = self.ufl_form
             t = self._ufl_coef
@@ -40,12 +60,13 @@ class Spline:
     def derivative(self):
         knots = self.knots
         coef_array = np.array(
-                [Polynomial(coefficients).deriv().coef
-                for coefficients in self.coef_array])
+                [Polynomial(coef).deriv().coef
+                for coef in self.coef_array])
         return Spline(knots, coef_array)
 
-    def dump(self, filename='spline.npz'):
-        np.savez(filename, knots=self.knots, coef_array=self.coef_array)
+    def dump(self, file='spline.npz'):
+        '''Dumps into a file.'''
+        np.savez(file, knots=self.knots, coef_array=self.coef_array)
 
     @property
     def ufl_form(self):
@@ -68,10 +89,10 @@ class Spline:
                    * Polynomial(coef_array[0])(t)
 
         # assigning internal polynomials
-        for knot, knot_, coefficients in\
+        for knot, knot_, coef in\
                 zip(knots[:-1], knots[1:], coef_array[1:-1]):
             form += ufl.conditional(And(ge(t, knot), lt(t, knot_)), 1., 0.)\
-                        * Polynomial(coefficients)(t)
+                        * Polynomial(coef)(t)
 
         # assigning right polynomial
         form += ufl.conditional(ge(t, knots[-1]), 1., 0.)\
@@ -96,9 +117,9 @@ class HermiteSpline(Spline):
 
         for i in range(len(knots) - 1):
             p = hermine_interpolating_polynomial(
-                    [knots[i], knots[i+1]],
-                    [values[i], values[i+1]],
-                    [derivatives[i], derivatives[i+1]])
+                    knots=[knots[i], knots[i+1]],
+                    values=[values[i], values[i+1]],
+                    derivatives=[derivatives[i], derivatives[i+1]])
             coef_array[i+1, :len(p.coef)] = p.coef
 
         # assigning the left and the right polynomials based on the preferred
@@ -109,6 +130,7 @@ class HermiteSpline(Spline):
             k = Polynomial(coef_array[1]).deriv()(knots[0])
             b = values[0] - k*knots[0]
             coef_array[0] = b, k, 0, 0
+
         if extrapolation_right=='constant':
             coef_array[-1] = values[-1], 0, 0, 0
         elif extrapolation_right=='linear':
@@ -162,6 +184,15 @@ def hermine_interpolating_polynomial(knots, values, derivatives):
     return polynomial
 
 
-def load(filename='spline.npz'):
-    npz_obj = np.load(filename)
+def load(file='spline.npz'):
+    '''Loads a previously dumped Spline object.
+
+    Parameters:
+        file: str or a file object
+
+    Returns:
+        spline: Spline
+
+    '''
+    npz_obj = np.load(file)
     return Spline(npz_obj['knots'], npz_obj['coef_array'])
