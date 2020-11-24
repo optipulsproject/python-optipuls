@@ -263,9 +263,6 @@ class Simulation():
             return self._J_total
 
 
-
-s = vhc
-
 def kappa(theta):
     return dolfin.as_matrix([[kappa_rad(theta), Constant("0.0")],
                              [Constant("0.0"), kappa_ax(theta)]])
@@ -291,10 +288,10 @@ def avg(u_k, u_kp1, implicitness=implicitness):
 def a(u_k, u_kp1, v, control_k):
     u_avg = avg(u_k, u_kp1)
 
-    a_ = s(u_k) * (u_kp1 - u_k) * v * x[0] * dx\
-      + dt * inner(kappa(u_k) * grad(u_avg), grad(v)) * x[0] * dx\
-      - dt * laser_bc(control_k) * v * x[0] * ds(1)\
-      - dt * cooling_bc(u_avg) * v * x[0] * (ds(1) + ds(2))
+    a_ = vhc(u_k) * (u_kp1 - u_k) * v * x[0] * dx\
+       + dt * inner(kappa(u_k) * grad(u_avg), grad(v)) * x[0] * dx\
+       - dt * laser_bc(control_k) * v * x[0] * ds(1)\
+       - dt * cooling_bc(u_avg) * v * x[0] * (ds(1) + ds(2))
 
     return a_
 
