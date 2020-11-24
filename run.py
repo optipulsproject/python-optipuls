@@ -14,7 +14,6 @@ parser.add_argument('-s', '--scratch', default='/scratch/OptiPuls/current')
 args = parser.parse_args()
 
 
-
 problem = core.Problem()
 problem.V = dolfin.FunctionSpace(core.mesh, "CG", 1)
 problem.theta_init = dolfin.project(core.temp_amb, problem.V)
@@ -27,6 +26,10 @@ opts = core.OptimizationParameters(
         penalty_expression=core.J_expression,
         implicitness=core.implicitness)
 problem.opts = opts
+
+core.vhc.problem = problem
+core.kappa_rad.problem = problem
+core.kappa_ax.problem = problem
 
 time_space = np.linspace(0, core.T, num=core.Nt, endpoint=True)
 control = .25 * np.sin(time_space*np.pi / (2*core.T)) + .5

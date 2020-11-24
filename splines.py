@@ -1,7 +1,11 @@
 import numpy as np
 from numpy.polynomial import Polynomial
-from ufl import *
-from dolfin import *
+from ufl import ge, gt, lt, le, And
+import ufl
+import dolfin
+
+import numbers
+
 
 
 p0 = h00 = np.array([1, 0, -3,  2])  # 1 - 3*x^2 + 2*x^3
@@ -21,12 +25,17 @@ class Spline:
         self.coef_array = coef_array
 
     def __call__(self, x):
-        for (knot, coefficients) in zip(self.knots, self.coef_array):
-            if x < knot:
+        if isinstance(x, numbers.Number):
+            for (knot, coefficients) in zip(self.knots, self.coef_array):
+                if x < knot:
+                    return Polynomial(coefficients)(x)
+            else:
+                coefficients = self.coef_array[-1]
                 return Polynomial(coefficients)(x)
-        else:
-            coefficients = self.coef_array[-1]
-            return Polynomial(coefficients)(x)
+        elif isinstance(x, dolfin.function.function.Function):
+            ufl_form = self.ufl_form
+            t = self._ufl_coef
+            return ufl.replace(ufl_form, {t: x})
 
     def derivative(self):
         knots = self.knots
@@ -35,31 +44,40 @@ class Spline:
                 for coefficients in self.coef_array])
         return Spline(knots, coef_array)
 
-    def ccode(self):
-        # ccode: '(x>=k1 && x<k2 ? a4*x^4 + a3*x^3 + a2*x^2 + a1*x + a_0 : 0)'
-        pass
+    def dump(self, filename='spline.npz'):
+        np.savez(filename, knots=self.knots, coef_array=self.coef_array)
 
-    def as_ufl(self):
-        def ufl_spline(t):
-            knots = self.knots
-            coef_array = self.coef_array
-            
-            # assigning left polynomial
-            expression = conditional(lt(t, knots[0]), 1., 0.)\
-                       * Polynomial(coef_array[0])(t)
+    @property
+    def ufl_form(self):
+        try:
+            return self._ufl_form
+        except AttributeError:
+            self._ufl_form = self.gen_ufl_form()
+            return self._ufl_form
 
-            # assigning internal polynomials
-            for knot, knot_, coefficients in\
-                    zip(knots[:-1], knots[1:], coef_array[1:-1]):
-                expression += conditional(And(ge(t, knot), lt(t, knot_)), 1., 0.)\
-                            * Polynomial(coefficients)(t)
+    def gen_ufl_form(self):
+        element = self.problem.V.ufl_element()
+        self._ufl_coef = ufl.Coefficient(element)
 
-            # assigning right polynomial
-            expression += conditional(ge(t, knots[-1]), 1., 0.)\
-                        * Polynomial(coef_array[-1])(t)
+        t = self._ufl_coef
+        knots = self.knots
+        coef_array = self.coef_array
 
-            return expression
-        return ufl_spline
+        # assigning left polynomial
+        form = ufl.conditional(lt(t, knots[0]), 1., 0.)\
+                   * Polynomial(coef_array[0])(t)
+
+        # assigning internal polynomials
+        for knot, knot_, coefficients in\
+                zip(knots[:-1], knots[1:], coef_array[1:-1]):
+            form += ufl.conditional(And(ge(t, knot), lt(t, knot_)), 1., 0.)\
+                        * Polynomial(coefficients)(t)
+
+        # assigning right polynomial
+        form += ufl.conditional(ge(t, knots[-1]), 1., 0.)\
+                    * Polynomial(coef_array[-1])(t)
+
+        return form
 
 
 class HermiteSpline(Spline):
@@ -76,19 +94,12 @@ class HermiteSpline(Spline):
         
         coef_array = np.zeros((len(knots)+1, 4), dtype=float)
 
-        # domain and window together with convert() from numpy.polynomial
-        # are used as a linear mapping t = (x - knot) / (knot_ - knot) 
-        for knot, knot_, p, p_, m, m_, coef in\
-                zip(knots[:-1], knots[1:],
-                    values[:-1], values[1:],
-                    derivatives[:-1], derivatives[1:],
-                    coef_array[1:-1]):
-
-            coef_unscaled = h00*p + h01*p_ + (h10*m + h11*m_) * (knot_ - knot)
-
-            p = Polynomial(coef_unscaled, domain=[knot, knot_], window=[0,1])
-            p = p.convert()
-            coef[:len(p.coef)] = p.coef
+        for i in range(len(knots) - 1):
+            p = hermine_interpolating_polynomial(
+                    [knots[i], knots[i+1]],
+                    [values[i], values[i+1]],
+                    [derivatives[i], derivatives[i+1]])
+            coef_array[i+1, :len(p.coef)] = p.coef
 
         # assigning the left and the right polynomials based on the preferred
         # extrapolation method
@@ -120,62 +131,37 @@ class NaiveHermiteSpline(HermiteSpline):
                                extrapolation_left, extrapolation_right)
 
 
-def gen_hermite_spline(knots, values, extrapolation='constant'):
-    '''Generates cubic Hermite spline interpolating given knots and values.
+def hermine_interpolating_polynomial(knots, values, derivatives):
+    '''Generates Hermite interpolating polynomial.
 
     Parameters:
-        knots: (n,) ndarray
-        values: (n,) ndarray
-             
+        knots: [float]
+            Two points on the x-axis.
+        values: [float]
+            The desired values at the given points.
+        derivatives: [float]
+            The desired derivatives at the given points.
+
     Returns:
-        spline: (n,4) ndarray
-            spline[i] contains four coefficients of the polynomial for the
-            half-open interval [knots[i],knots[i+1]) and one extrapolated
-            polynomial at the right end
+        polynomial: Polynomial
+            The generated Hermite interpolating polynomial.
 
     '''
 
-    # must be changed to monotone spline interpolation in the future
-    derivatives = np.gradient(values)
+    x0, x1 = knots
+    p0, p1 = values
+    m0, m1 = derivatives
 
-    left = np.outer(values[:-1],p0) + np.outer(derivatives[:-1],m0)
-    right = np.outer(values[1:],p1) + np.outer(derivatives[1:],m1)
+    coef_unscaled = h00*p0 + h01*p1 + (h10*m0 + h11*m1) * (x1 - x0)
 
-    spline = np.zeros((len(knots),4), dtype=float)
-
-    spline[:-1] = left + right
-
-    # scaling the polynomials
-    for i in range(len(spline)-1):
-        x_p = knots[i]
-        x_n = knots[i+1]
-        p = Polynomial(spline[i], domain=[x_p,x_n], window=[0,1])
-        p = p.convert()
-        spline[i,:len(p.coef)] = p.coef
-
-    # extrapolation to the right depends on the preferred extrapolation method
-    if extrapolation=='constant':
-        spline[-1] = values[-1], 0, 0, 0
-    elif extrapolation=='linear':
-        k = Polynomial(spline[-2]).deriv()(knots[-1])
-        spline[-1] = values[-1], k, 0, 0
-
-    return spline
+    # domain and window together with convert() from numpy.polynomial
+    # are used as a linear mapping t = (x - knot) / (knot_ - knot) 
+    polynomial = Polynomial(coef_unscaled, domain=[x0, x1], window=[0,1])
+    polynomial = polynomial.convert()
+    
+    return polynomial
 
 
-def spline_as_ufl(spline, knots):
-    def ufl_spline(t):
-        expression = 0
-
-        for i in range(len(spline)-1):
-            x_p = Constant(knots[i])
-            x_n = Constant(knots[i+1])
-            expression += conditional(And(ge(t,x_p),lt(t,x_n)), 1., 0.)\
-                        * Polynomial(spline[i])(t)
-
-        expression += conditional(ge(t,Constant(knots[-1])), 1., 0.)\
-                    * Polynomial(spline[-1])(t)
-
-        return expression
-
-    return ufl_spline
+def load(filename='spline.npz'):
+    npz_obj = np.load(filename)
+    return Spline(npz_obj['knots'], npz_obj['coef_array'])
