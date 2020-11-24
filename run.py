@@ -18,6 +18,7 @@ problem = core.Problem()
 problem.V = dolfin.FunctionSpace(core.mesh, "CG", 1)
 problem.theta_init = dolfin.project(core.temp_amb, problem.V)
 
+# Warning: don't change these parameters yet
 opts = core.OptimizationParameters(
         beta_welding=core.beta_welding,
         threshold_temp=core.threshold_temp,

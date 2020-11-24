@@ -38,7 +38,7 @@ radiation_coeff = 2.26 * 10**-9
 # Optimization parameters
 alpha = 0. # temporarily exclude the control cost
 beta_velocity = 1.
-beta_welding = 1.
+beta_welding = 0.
 beta_liquidity = 1.
 velocity_max = 0.12
 target_point = dolfin.Point(0, .5*Z)
@@ -389,13 +389,14 @@ def solve_adjoint(V, evo, control, opts):
     evo_adj = np.zeros((Nt+1, len(V.dofmap().dofs())))
 
     # PointSource's magnitute precalculation
-    sum_ = 0
-    for k in range(1, Nt+1):
-        theta_k.vector().set_local(evo[k])
-        sum_ += theta_k(opts.target_point) ** opts.pow_
-    p_norm = sum_ ** (1 / opts.pow_)
-    magnitude_pre = opts.beta_welding * (p_norm - opts.threshold_temp)\
-                  * sum_ ** (1/opts.pow_ - 1)
+    if opts.beta_welding:
+        sum_ = 0
+        for k in range(1, Nt+1):
+            theta_k.vector().set_local(evo[k])
+            sum_ += theta_k(opts.target_point) ** opts.pow_
+        p_norm = sum_ ** (1 / opts.pow_)
+        magnitude_pre = opts.beta_welding * (p_norm - opts.threshold_temp)\
+                      * sum_ ** (1/opts.pow_ - 1)
 
     # preparing for the first iteration
     # p[Nt] is never used so does not need to be initialized
@@ -421,11 +422,12 @@ def solve_adjoint(V, evo, control, opts):
         except ValueError:
             A, b = dolfin.assemble_system(dolfin.lhs(dF), Constant(0)*v*dx)
 
-        # calculate total magnitude and apply PointSource
-        magnitude = - magnitude_pre\
-                  * theta_k(opts.target_point) ** (opts.pow_ - 1)
-        point_source = dolfin.PointSource(V, opts.target_point, magnitude)
-        point_source.apply(b)
+        if opts.beta_welding:
+            # calculate total magnitude and apply PointSource
+            magnitude = - magnitude_pre\
+                      * theta_k(opts.target_point) ** (opts.pow_ - 1)
+            point_source = dolfin.PointSource(V, opts.target_point, magnitude)
+            point_source.apply(b)
 
         dolfin.solve(A, p_km1.vector(), b)
  
@@ -681,11 +683,13 @@ def liquidity(theta_k, theta_kp1, implicitness=implicitness):
     return expression
 
 
-
 def J_expression(k, theta_k, theta_kp1):
-
-    e = Constant(beta_liquidity) * liquidity(theta_k, theta_kp1)**2 * x[0] * dx\
-      + Constant(beta_velocity) * velocity(theta_k, theta_kp1)**2 * x[0] * dx
+    # if beta_liquidity:
+    e = Constant(beta_liquidity) *\
+            liquidity(theta_k, theta_kp1)**2 * x[0] * dx
+    # if beta_velocity:
+    e += Constant(beta_velocity) *\
+            velocity(theta_k, theta_kp1)**2 * x[0] * dx
 
     return e
 
@@ -713,8 +717,11 @@ def J_vector(V, evolution, control):
 
 def J_total(V, evolution, control):
 
-    J_vector_ = J_vector(V, evolution, control)
-    return dt * J_vector_.sum() + J_welding(V, evolution, control)
+    total = dt * J_vector(V, evolution, control).sum()
+    if beta_welding:
+        total += J_welding(V, evolution, control)
+
+    return total
 
 
 def J_welding(V, evolution, control):
