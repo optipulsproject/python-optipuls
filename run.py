@@ -24,7 +24,7 @@ opts = core.OptimizationParameters(
         threshold_temp=core.threshold_temp,
         target_point=core.target_point,
         pow_=core.pow_,
-        penalty_expression=core.J_expression,
+        penalty_term_combined=core.penalty_term_combined,
         implicitness=core.implicitness)
 problem.opts = opts
 

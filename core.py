@@ -36,7 +36,7 @@ radiation_coeff = 2.26 * 10**-9
 
 
 # Optimization parameters
-alpha = 0. # temporarily exclude the control cost
+beta_control = 0. # temporarily exclude the control cost
 beta_velocity = 1.
 beta_welding = 0.
 beta_liquidity = 1.
@@ -53,7 +53,7 @@ OptimizationParameters = namedtuple(
             'threshold_temp',
             'target_point',
             'pow_',
-            'penalty_expression',
+            'penalty_term_combined',
             'implicitness',
         ])
 
@@ -199,7 +199,8 @@ class Simulation():
         try:
             return self._penalty_velocity_vector
         except AttributeError:
-            self._penalty_velocity_vector = penalty_vector(self.evo, velocity)
+            self._penalty_velocity_vector = vectorize_penalty_term(
+                    self.problem.V, self.evo, penalty_term_velocity)
             return self._penalty_velocity_vector
 
     @property
@@ -208,7 +209,7 @@ class Simulation():
             return self._penalty_velocity_total
         except AttributeError:
             self._penalty_velocity_total =\
-                    dt * sum(self.penalty_velocity_vector)
+                    sum(self.penalty_velocity_vector)
             return self._penalty_velocity_total
 
     @property
@@ -216,7 +217,8 @@ class Simulation():
         try:
             return self._penalty_liquidity_vector
         except AttributeError:
-            self._penalty_liquidity_vector = penalty_vector(self.evo, liquidity)
+            self._penalty_liquidity_vector = vectorize_penalty_term(
+                    self.problem.V, self.evo, penalty_term_liquidity)
             return self._penalty_liquidity_vector
 
     @property
@@ -225,7 +227,7 @@ class Simulation():
             return self._penalty_liquidity_total
         except AttributeError:
             self._penalty_liquidity_total =\
-                    dt * sum(self.penalty_liquidity_vector)
+                    sum(self.penalty_liquidity_vector)
             return self._penalty_liquidity_total
 
     @property
@@ -233,7 +235,8 @@ class Simulation():
         try:
             return self._penalty_welding_total
         except AttributeError:
-            self._penalty_welding_total = J_welding(self.evo, self.control)
+            self._penalty_welding_total = penalty_welding(
+                    self.evo, self.control)
             return self._penalty_welding_total
 
     @property
@@ -259,7 +262,7 @@ class Simulation():
         try:
             return self._J_total
         except AttributeError:
-            self._J_total = J(self.problem.V, self.evo, self.control)
+            self._J_total = cost_total(self.problem.V, self.evo, self.control)
             return self._J_total
 
 
@@ -276,9 +279,11 @@ def cooling_bc(theta):
     return - convection_coeff * (theta - temp_amb)\
            - radiation_coeff * (theta**4 - temp_amb**4)
 
+def norm2(vector):
+    return dt * sum(vector**2)
 
 def norm(vector):
-    return np.sqrt(dt * sum(vector**2))
+    return np.sqrt(norm2(vector))
 
 
 def avg(u_k, u_kp1, implicitness=implicitness):
@@ -408,11 +413,11 @@ def solve_adjoint(V, evo, control, opts):
         theta_km1.vector().set_local(evo[k-1])
 
         F = a(theta_km1, theta_k, p, control[k-1])\
-          + dt * opts.penalty_expression(k-1, theta_km1, theta_k)
+          + opts.penalty_term_combined(k-1, theta_km1, theta_k)
 
         if k < Nt:
             F += a(theta_k, theta_kp1, p_k, control[k])\
-               + dt * opts.penalty_expression(k, theta_k, theta_kp1)
+               + opts.penalty_term_combined(k, theta_k, theta_kp1)
 
         dF = dolfin.derivative(F, theta_k, v)
         
@@ -464,7 +469,7 @@ def Dj(V, evo_adj, control):
         p.vector().set_local(evo_adj[i])
         z[i] = dolfin.assemble(p * x[0] * ds(1))
     
-    Dj = alpha * (control-control_ref) - laser_pd*z
+    Dj = beta_control * (control-control_ref) - laser_pd*z
 
     return Dj
 
@@ -541,32 +546,6 @@ def gradient_descent(simulation, iter_max=50, step_init=1, tolerance=10**-9):
     return descent
 
 
-# def J(evolution, control, as_vector=False, **kwargs):
-#     '''Calculates the cost functional.'''
-
-#     # cost = 0.
-#     theta = Function(V)
-#     theta_ = Function(V)
-
-#     vector = np.zeros(Nt)
-
-#     theta.vector().set_local(evolution[0])
-#     for k in range(Nt):
-#         theta_.vector().set_local(evolution[k+1])
-#         # value = dt * assemble(velocity(theta, theta_)**2 * x[0] * dx)
-#         # cost += value
-#         vector[k] += dt * assemble(velocity(theta, theta_)**2 * x[0] * dx)
-#         vector[k] += dt * assemble(liquidity(theta, theta_)**2 * x[0] * dx)
-#         theta.assign(theta_)
-
-#     # vector += 0.5 * alpha * (control-control_ref)**2
-
-#     if as_vector:
-#         return vector
-#     else:
-
-
-
 def gradient_test(simulation, iter_max=15, eps_init=.1, diff_type='forward'):
     '''Checks the accuracy of the calculated gradient Dj.
 
@@ -641,23 +620,28 @@ def gradient_test(simulation, iter_max=15, eps_init=.1, diff_type='forward'):
     return epsilons, deltas
 
 
-def velocity(theta_k, theta_kp1, velocity_max=velocity_max):
+def penalty_term_velocity(k, theta_k, theta_kp1, velocity_max=velocity_max):
     theta_avg = avg(theta_k, theta_kp1)
     grad_norm = ufl.sqrt(inner(grad(theta_avg), grad(theta_avg)) + DOLFIN_EPS)
 
-    expression = (theta_kp1 - theta_k) / dt / grad_norm
-
-    expression *= conditional(
+    func = (theta_kp1 - theta_k) / dt / grad_norm
+    # filter to the solidus-liquidus corridor
+    func *= conditional(
             And(ge(theta_k, solidus), lt(theta_kp1, liquidus)), 1., 0.)
-    expression *= conditional(le(expression, 0.), 1., 0.)
-    expression *= conditional(ge(-expression, velocity_max), 1., 0.)
-    expression *= -1
+    # filter to negative values only (cooling down)
+    func *= conditional(le(func, 0.), 1., 0.)
+    # allow small values and cut them off
+    func *= conditional(ge(-func, velocity_max), 1., 0.)
+    # invert the sign
+    func *= -1
 
-    return expression
+    form = func**2 * x[0] * dx
+
+    return form
 
 
-def liquidity(theta_k, theta_kp1, implicitness=implicitness):
-    '''Returns the "liquidity" penalty expression.
+def penalty_term_liquidity(k, theta_k, theta_kp1, implicitness=implicitness):
+    '''Returns a UFL form corresponding to the liquidity penalty term.
 
     Parameters:
         theta_k: Function(V)
@@ -669,90 +653,97 @@ def liquidity(theta_k, theta_kp1, implicitness=implicitness):
             parameter is used by default.
 
     Returns:
-        expression: FEniCS expression
-            The expression for the adjoint equation.
-
+        form: UFL form
+            A valid UFL form for assembling.
 
     '''
     
     theta_avg = avg(theta_k, theta_kp1, implicitness)
 
-    expression = theta_avg - Constant(solidus)
-    expression *= conditional(ge(expression, 0.), 1., 0.)
+    func = theta_avg - Constant(solidus)
+    # filter to liquid parts
+    func *= conditional(ge(func, 0.), 1., 0.)
 
-    return expression
+    form = func**2 * x[0] * dx
 
-
-def J_expression(k, theta_k, theta_kp1):
-    # if beta_liquidity:
-    e = Constant(beta_liquidity) *\
-            liquidity(theta_k, theta_kp1)**2 * x[0] * dx
-    # if beta_velocity:
-    e += Constant(beta_velocity) *\
-            velocity(theta_k, theta_kp1)**2 * x[0] * dx
-
-    return e
+    return form
 
 
-def J_vector(V, evolution, control):
-    '''WARNING: control cost is presented here!'''
+def penalty_term_combined(k, theta_k, theta_kp1):
+    '''Provides a linear combination of different penalty terms as a UFL form
+    for solve_adjoint.'''
+    form = dt * Constant(beta_liquidity) *\
+           penalty_term_liquidity(k, theta_k, theta_kp1)
+    form += dt * Constant(beta_velocity) *\
+            penalty_term_velocity(k, theta_k, theta_kp1)
 
-    theta = dolfin.Function(V)
-    theta_ = dolfin.Function(V)
-
-    Nt = len(evolution) - 1
-    J_vector_ = np.zeros(Nt)
-
-    theta.vector().set_local(evolution[0])
-    for k in range(Nt):
-        theta_.vector().set_local(evolution[k+1])
-        e = J_expression(k, theta, theta_)
-        J_vector_[k] = dolfin.assemble(e)
-        theta.assign(theta_)
-
-    J_vector_ += .5 * alpha *(control-control_ref)**2
-
-    return J_vector_
+    return form
 
 
-def J_total(V, evolution, control):
+def penalty_welding(V, evo, control):
+    '''Penalty due to the maximal temperature at the target point.'''
 
-    total = dt * J_vector(V, evolution, control).sum()
-    if beta_welding:
-        total += J_welding(V, evolution, control)
-
-    return total
-
-
-def J_welding(V, evolution, control):
     sum_ = 0
     theta = dolfin.Function(V)
     for k in range(1, Nt+1):
-        theta.vector().set_local(evolution[k])
+        theta.vector().set_local(evo[k])
         sum_ += np.float_power(theta(target_point), pow_)
     norm = np.float_power(sum_, 1/pow_)
     result = .5 * beta_welding * (norm - threshold_temp)**2
 
     return result
 
-J = J_total
 
+def vectorize_penalty_term(V, evo, penalty_term):
+    '''Takes a penalty_term and provides a vector of penalties at time steps.
 
-def penalty_vector(evo, penalty_term):
+    Parameters:
+        V: dolfin.FunctionSpace
+            The FEM space of the problem being solved.
+        evo: ndarray
+            The coefficients of the solution to the corresponding forward
+            problem in the basis of the space V (see solve_forward).
+
+        penalty_term: (k, theta_k, theta_kp1, *args) -> UFL form
+            Penalty term as a UFL form to be assembled and vectorized.
+
+    Returns:
+        penalty_vector: ndarray
+            Contains penalty values due to penalty_term at every time step.
+
+    '''
+
     theta_k = dolfin.Function(V)
     theta_kp1 = dolfin.Function(V)
 
     Nt = len(evo) - 1
-    vector = np.zeros(Nt)
+    penalty_vector = np.zeros(Nt)
 
     theta_k.vector().set_local(evo[0])
     for k in range(Nt):
         theta_kp1.vector().set_local(evo[k+1])
-        expression = penalty_term(theta_k, theta_kp1)**2 * x[0] * dx
-        vector[k] = dolfin.assemble(expression)
+        penalty_vector[k] = dolfin.assemble(penalty_term(k, theta_k, theta_kp1))
         theta_k.assign(theta_kp1)
 
-    return vector
+    return penalty_vector
+
+
+def cost_total(V, evo, control):
+    '''Calculates the total cost of a given simulation.
+
+    This function puts together all the penalties from different terms.
+
+    '''
+
+    # penalties from integral terms
+    cost = vectorize_penalty_term(V, evo, penalty_term_combined).sum()
+    # control penalty
+    cost += .5 * beta_control * norm2(control - control_ref)
+    # welding penalty
+    if beta_welding:
+        cost += penalty_welding(V, evo, control)
+
+    return cost
 
 
 def temp_at_point_vector(evo, point):
