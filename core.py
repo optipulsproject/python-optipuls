@@ -286,6 +286,23 @@ class Simulation():
             self._J_total = cost_total(self.problem.V, self.evo, self.control)
             return self._J_total
 
+    def report(self):
+        print(f'''
+simulation report
+=================
+
+penalty_control_total:      {self.penalty_control_total:.7e}
+penalty_velocity_total:     {self.penalty_velocity_total:.7e}
+penalty_liquidity_total:    {self.penalty_liquidity_total:.7e}
+penalty_welding_total:      {self.penalty_welding_total:.7e}
+-----------------------------------------
+cost_total:                 {self.J:.7e}
+
+energy_total:               {self.energy_total:9.6} [J]
+time_total:                 {T:9.6} [s]
+temp_target_point_max:      {self.temp_target_point_vector.max():9.6} [K]
+''')
+
 
 def kappa(theta):
     return dolfin.as_matrix([[kappa_rad(theta), Constant("0.0")],
