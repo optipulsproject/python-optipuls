@@ -227,7 +227,8 @@ class Simulation():
             return self._penalty_liquidity_total
         except AttributeError:
             self._penalty_liquidity_total =\
-                    sum(self.penalty_liquidity_vector)
+                    self.penalty_liquidity_vector[-1]
+                    # sum(self.penalty_liquidity_vector)
             return self._penalty_liquidity_total
 
     @property
