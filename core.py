@@ -20,13 +20,13 @@ dolfin.parameters["form_compiler"]["quadrature_degree"] = 1
 R = 0.0025
 R_laser = 0.0002
 Z = 0.0005
-T, Nt = 0.010, 30
+T, Nt = 0.015, 300
 dt = T/Nt
 
 # Model constants
 temp_amb = 295.
 # enthalpy = Constant("397000")
-P_YAG = 1600.
+P_YAG = 2000.
 absorb = 0.135
 laser_pd = (absorb * P_YAG) / (np.pi * R_laser**2)
 implicitness = 1.
@@ -36,11 +36,11 @@ radiation_coeff = 2.26 * 10**-9
 
 
 # Optimization parameters
-beta_control = 10**3
-beta_velocity = 10**17
+beta_control = 10**2
+beta_velocity = 10**18
 beta_welding = 10**-2
 beta_liquidity = 10**12
-velocity_max = 0.12
+velocity_max = 0.15
 target_point = dolfin.Point(0, .7*Z)
 central_point = dolfin.Point(0, 0)
 threshold_temp = 1000.
@@ -864,3 +864,4 @@ class Problem:
     # facade
     def solve_forward(self, control):
         return solve_forward(self.V, self.theta_init, control)
+
