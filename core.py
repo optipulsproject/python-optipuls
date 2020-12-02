@@ -270,6 +270,11 @@ class Simulation():
             return self._temp_central_point_vector
 
     @property
+    def energy_total(self):
+        '''Total used energy [J].'''
+        return P_YAG * dt * sum(self.control)
+
+    @property
     def J(self):
         try:
             return self._J_total
