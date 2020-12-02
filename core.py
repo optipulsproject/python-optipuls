@@ -179,6 +179,15 @@ class Simulation():
             return self._evo_adj
 
     @property
+    def evo_vel(self):
+        try:
+            return self._evo_vel
+        except AttributeError:
+            self._evo_vel = compute_evo_vel(
+                    self.problem.V, self.problem.V1, self.evo)
+            return self._evo_vel
+
+    @property
     def Dj(self):
         try:
             return self._Dj
@@ -767,6 +776,80 @@ def temp_at_point_vector(V, evo, point):
         vector[k] = theta_k(point)
 
     return vector
+
+
+def velocity(theta_k, theta_kp1, velocity_max=velocity_max, implicitness=.5):
+    '''Provides the UFL form of the velocity function.
+
+    Parameters:
+        theta_k: dolfin.Function(V)
+            Function representing the state from the current time slice.
+        theta_kp1: dolfin.Function(V)
+            Function representing the state from the next time slice.
+        velocity_max: float
+            The maximal allowed velocity which will not be penalized.
+        implicitness: float
+            The weight of theta_kp1 in the expression. Normally, should stay
+            default. 
+        implicitness: float
+
+    Returns:
+        form: UFL form
+            The UFL form of theta_k and theta_kp1.
+
+    '''
+
+    theta_avg = avg(theta_k, theta_kp1, implicitness=.5)
+    grad_norm = ufl.sqrt(inner(grad(theta_avg), grad(theta_avg)) + DOLFIN_EPS)
+    form = (theta_kp1 - theta_k) / dt / grad_norm
+    # filter to negative values over velocity_max in the solidus-liquidus
+    # corridor and invert the sign
+    form += dolfin.Constant(velocity_max)
+    form *= conditional(le(form, 0.), 1., 0.)
+    form *= conditional(
+            And(ge(theta_k, solidus), lt(theta_kp1, liquidus)), 1., 0.)
+    form *= -1
+
+    return form
+
+
+def compute_evo_vel(V, V1, evo):
+    '''Computes the velocity evolution.
+
+    Parameters:
+        V: dolfin.FunctionSpace
+            The FEM space of the forward solution.
+        V1: dolfin.FunctionSpace
+            The FEM space to project the velocity on.
+        evo: ndarray
+            The coefficients of the solution to the corresponding forward
+            problem in the basis of the space V (see solve_forward).
+
+    Returns:
+        evo_vel: ndarray
+            The coefficients of the calculated velocity in the basis of
+            the space V1 at each time step.
+
+    '''
+
+    theta_k = dolfin.Function(V)
+    theta_kp1 = dolfin.Function(V)
+
+    Nt = len(evo) - 1
+    evo_vel = np.zeros((Nt+1, len(V1.dofmap().dofs())))
+
+    theta_k.vector().set_local(evo[0])
+    for k in range(Nt):
+        theta_kp1.vector().set_local(evo[k+1])
+
+        form = velocity(theta_k, theta_kp1)
+        func = dolfin.project(velocity(theta_k, theta_kp1), V1)
+
+        evo_vel[k] = func.vector().get_local()
+
+        theta_k.assign(theta_kp1)
+
+    return evo_vel
 
 
 class Problem:
