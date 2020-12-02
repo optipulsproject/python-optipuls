@@ -250,6 +250,10 @@ class Simulation():
             return self._penalty_welding_total
 
     @property
+    def penalty_control_total(self):
+        return .5 * beta_control * norm2(self.control - control_ref)
+
+    @property
     def temp_target_point_vector(self):
         try:
             return self._temp_target_point_vector
