@@ -645,7 +645,7 @@ def gradient_test(simulation, iter_max=15, eps_init=.1, diff_type='forward'):
 
 
 def penalty_term_velocity(k, theta_k, theta_kp1, velocity_max=velocity_max):
-    theta_avg = avg(theta_k, theta_kp1)
+    theta_avg = avg(theta_k, theta_kp1, implicitness=.5)
     grad_norm = ufl.sqrt(inner(grad(theta_avg), grad(theta_avg)) + DOLFIN_EPS)
 
     func = (theta_kp1 - theta_k) / dt / grad_norm
