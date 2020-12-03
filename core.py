@@ -317,9 +317,15 @@ def solve_adjoint(V, evo, control, opts):
 def Dj(V, evo_adj, control):
     '''Calculates the gradient of the cost functional for the given control.
 
+
+    Notice that the impact of all the penalty terms (except the control penalty
+    term) on the gradient is already reflected in the adjoint solution.
+
     For further details, see `indexing diagram`.
 
     Parameters:
+        V: dolfin.FunctionSpace
+            The FEM space of the adjoint solution.
         evo_adj: ndarray
             The evolution in time of the adjoint state.
         control: ndarray
