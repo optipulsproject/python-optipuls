@@ -14,9 +14,6 @@ from coefficients import vhc, kappa_rad, kappa_ax
 from simulation import Simulation
 
 
-dolfin.set_log_level(40)
-dolfin.parameters["form_compiler"]["quadrature_degree"] = 1
-
 # Space and time discretization parameters
 R = 0.0025
 R_laser = 0.0002
@@ -130,8 +127,6 @@ laser_boundary.mark(boundary_markers, 1)
 empty_boundary = EmptyBoundary()
 empty_boundary.mark(boundary_markers, 2)
 
-sym_axis_boundary = SymAxisBoundary()
-sym_axis_boundary.mark(boundary_markers, 3)
 
 ds = dolfin.Measure('ds', domain=mesh, subdomain_data=boundary_markers)
 
@@ -141,8 +136,9 @@ class DescendLoopException(Exception):
 
 
 def kappa(theta):
-    return dolfin.as_matrix([[kappa_rad(theta), Constant("0.0")],
-                             [Constant("0.0"), kappa_ax(theta)]])
+    return dolfin.as_matrix(
+            [[kappa_rad(theta), Constant(0)],
+             [Constant(0), kappa_ax(theta)]])
 
 
 def laser_bc(control_k):
@@ -153,8 +149,10 @@ def cooling_bc(theta):
     return - convection_coeff * (theta - temp_amb)\
            - radiation_coeff * (theta**4 - temp_amb**4)
 
+
 def norm2(vector):
     return dt * sum(vector**2)
+
 
 def norm(vector):
     return np.sqrt(norm2(vector))
