@@ -44,17 +44,6 @@ central_point = dolfin.Point(0, 0)
 threshold_temp = 1000.
 pow_ = 20.
 
-OptimizationParameters = namedtuple(
-        'OptimizationParameters',
-        [
-            'beta_welding',
-            'threshold_temp',
-            'target_point',
-            'pow_',
-            'penalty_term_combined',
-            'implicitness',
-        ])
-
 control_ref = np.zeros(Nt)
 
 # Aggregate state
@@ -710,13 +699,3 @@ def compute_evo_vel(V, V1, evo):
         theta_k.assign(theta_kp1)
 
     return evo_vel
-
-
-class Problem:
-    def __init__(self):
-        pass
-
-    # facade
-    def solve_forward(self, control):
-        return solve_forward(self.V, self.theta_init, control)
-

@@ -17,19 +17,27 @@ parser.add_argument('-s', '--scratch', default='/scratch/OptiPuls/current')
 args = parser.parse_args()
 
 
-problem = core.Problem()
+# set dolfin parameters
+dolfin.set_log_level(40)
+dolfin.parameters["form_compiler"]["quadrature_degree"] = 1
+
+
+# set optimization options
+# warning: changing of these values can currently break the optimization
+opts = OptimizationParameters()
+opts.beta_welding = core.beta_welding
+opts.threshold_temp = core.threshold_temp
+opts.target_point = core.target_point
+opts.pow_ = core.pow_
+opts.penalty_term_combined = core.penalty_term_combined
+opts.implicitness = core.implicitness
+
+
+# set up the problem
+problem = Problem()
 problem.V = dolfin.FunctionSpace(core.mesh, "CG", 1)
 problem.V1 = dolfin.FunctionSpace(core.mesh, "DG", 0)
 problem.theta_init = dolfin.project(core.temp_amb, problem.V)
-
-# Warning: don't change these parameters yet
-opts = core.OptimizationParameters(
-        beta_welding=core.beta_welding,
-        threshold_temp=core.threshold_temp,
-        target_point=core.target_point,
-        pow_=core.pow_,
-        penalty_term_combined=core.penalty_term_combined,
-        implicitness=core.implicitness)
 problem.opts = opts
 
 core.vhc.problem = problem
