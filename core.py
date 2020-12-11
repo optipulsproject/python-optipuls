@@ -162,8 +162,9 @@ def a(u_k, u_kp1, v, control_k):
     return a_
 
 
-def solve_forward(V, theta_init, control):
-    '''Calculates the solution to the forward problem with the given control.
+def solve_forward(a, V, theta_init, control):
+    '''Calculates the solution to the nonlinear time-dependent forward problem
+    with the given control.
 
     This is a low level function, which is normally not supposed to be used
     directly by the end user. High level interfaces such as Simulation.evo must
@@ -172,6 +173,8 @@ def solve_forward(V, theta_init, control):
     For further details, see the indexing diagram.
 
     Parameters:
+        a: (u_k, u_kp1, v, control_k) -> UFL form
+            The RHS variational form.
         V: dolfin.FunctionSpace
             The FEM space of the problem being solved.
         theta_init: dolfin.Function(V)
