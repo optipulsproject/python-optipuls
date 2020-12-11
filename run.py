@@ -8,6 +8,7 @@ import visualization as vis
 from utils import io, laser
 from simulation import Simulation
 from problem import Problem, OptimizationParameters
+from mesh import mesh
 
 
 # parse command line arguments
@@ -35,8 +36,8 @@ opts.implicitness = core.implicitness
 
 # set up the problem
 problem = Problem()
-problem.V = dolfin.FunctionSpace(core.mesh, "CG", 1)
-problem.V1 = dolfin.FunctionSpace(core.mesh, "DG", 0)
+problem.V = dolfin.FunctionSpace(mesh, "CG", 1)
+problem.V1 = dolfin.FunctionSpace(mesh, "DG", 0)
 problem.theta_init = dolfin.project(core.temp_amb, problem.V)
 problem.opts = opts
 
