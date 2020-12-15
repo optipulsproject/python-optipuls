@@ -14,6 +14,14 @@ class Problem:
                 self.beta_welding, self.target_point, self.threshold_temp,
                 self.penalty_term_combined)
 
+    def Dj(self, evo_adj, control):
+        return core.Dj(
+                self.V,
+                evo_adj, control,
+                self.control_ref,
+                self.beta_welding,
+                self.laser_pd)
+
 
 class OptimizationParameters:
     pass

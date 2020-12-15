@@ -36,6 +36,8 @@ problem.a = core.a
 problem.V = dolfin.FunctionSpace(mesh, "CG", 1)
 problem.V1 = dolfin.FunctionSpace(mesh, "DG", 0)
 problem.theta_init = dolfin.project(core.temp_amb, problem.V)
+problem.control_ref = np.zeros(core.Nt)
+problem.laser_pd = core.laser_pd
 
 problem.liquidus = 923.0
 problem.solidus = 858.0

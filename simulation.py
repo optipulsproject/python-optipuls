@@ -52,7 +52,7 @@ class Simulation():
         try:
             return self._Dj
         except AttributeError:
-            self._Dj = core.Dj(self.problem.V, self.evo_adj, self.control)
+            self._Dj = self.problem.Dj(self.evo_adj, self.control)
             return self._Dj
 
     @property
