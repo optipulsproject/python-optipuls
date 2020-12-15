@@ -22,6 +22,12 @@ class Problem:
                 self.beta_welding,
                 self.laser_pd)
 
+    def norm2(self, vector):
+        return core.norm2(self.dt, vector)
+
+    def norm(self, vector):
+        return core.norm(self.dt, vector)
+
 
 class OptimizationParameters:
     pass
