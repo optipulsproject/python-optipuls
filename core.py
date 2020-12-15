@@ -272,6 +272,7 @@ def Dj(V, evo_adj, control):
     '''
 
     p = dolfin.Function(V)
+    Nt = len(evo_adj) - 1
     z = np.zeros(Nt)
 
     for i in range(Nt):
