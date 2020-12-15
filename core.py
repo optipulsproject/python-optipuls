@@ -253,7 +253,7 @@ def solve_adjoint(a, V, evo, control,
     return evo_adj
 
 
-def Dj(V, evo_adj, control):
+def Dj(V, evo_adj, control, control_ref, beta_welding, laser_pd):
     '''Calculates the gradient of the cost functional for the given control.
 
 
