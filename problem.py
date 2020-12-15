@@ -1,10 +1,11 @@
+import core
+
 class Problem:
     def __init__(self):
-        pass
+        self.a = core.a  # dummy
 
-    # facade
     def solve_forward(self, control):
-        return solve_forward(self.V, self.theta_init, control)
+        return core.solve_forward(self.a, self.V, self.theta_init, control)
 
 class OptimizationParameters:
     pass

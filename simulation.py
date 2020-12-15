@@ -27,8 +27,7 @@ class Simulation():
         try:
             return self._evo
         except AttributeError:
-            self._evo = core.solve_forward(
-                core.a, self.problem.V, self.problem.theta_init, self.control)
+            self._evo = self.problem.solve_forward(self.control)
             return self._evo
 
     @property
