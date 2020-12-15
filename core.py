@@ -495,7 +495,8 @@ def penalty_term_combined(k, theta_k, theta_kp1):
     return form
 
 
-def penalty_welding(V, evo, control):
+def penalty_welding(V, evo, control,
+                    target_point, threshold_temp, pow_):
     '''Penalty due to the maximal temperature at the target point.'''
 
     sum_ = 0
