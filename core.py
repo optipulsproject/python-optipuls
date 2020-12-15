@@ -71,12 +71,14 @@ def cooling_bc(theta):
            - radiation_coeff * (theta**4 - temp_amb**4)
 
 
-def norm2(vector):
+def norm2(dt, vector):
+    '''Calculates the squared L2[0,T] norm.'''
     return dt * sum(vector**2)
 
 
-def norm(vector):
-    return np.sqrt(norm2(vector))
+def norm(dt, vector):
+    '''Calculates L2[0,T] norm.'''
+    return np.sqrt(norm2(dt, vector))
 
 
 def avg(u_k, u_kp1, implicitness=implicitness):
