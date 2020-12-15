@@ -147,7 +147,9 @@ def solve_forward(a, V, theta_init, control):
     return evo
 
 
-def solve_adjoint(V, evo, control, opts):
+def solve_adjoint(a, V, evo, control,
+                  beta_welding, target_point, threshold_temp,
+                  penalty_term_combined):
     '''Calculates the solution to the adjoint problem.
 
     The solution to the adjoint equation is calculated using the explicitly
@@ -163,8 +165,10 @@ def solve_adjoint(V, evo, control, opts):
             problem in the basis of the space V (see solve_forward).
         control: ndarray
             The laser power profile.
-        opts: object
-            Contains optimization parameters required in the adjoint_equation.
+        beta_welding
+        target_point: dolfin.Point
+        threshold_temp
+        penalty_term_combined
 
     Returns:
         evo_adj: ndarray
@@ -190,14 +194,14 @@ def solve_adjoint(V, evo, control, opts):
     evo_adj = np.zeros((Nt+1, len(V.dofmap().dofs())))
 
     # PointSource's magnitute precalculation
-    if opts.beta_welding:
+    if beta_welding:
         sum_ = 0
         for k in range(1, Nt+1):
             theta_k.vector().set_local(evo[k])
-            sum_ += theta_k(opts.target_point) ** opts.pow_
-        p_norm = sum_ ** (1 / opts.pow_)
-        magnitude_pre = opts.beta_welding * (p_norm - opts.threshold_temp)\
-                      * sum_ ** (1/opts.pow_ - 1)
+            sum_ += theta_k(target_point) ** pow_
+        p_norm = sum_ ** (1 / pow_)
+        magnitude_pre = beta_welding * (p_norm - threshold_temp)\
+                      * sum_ ** (1/pow_ - 1)
 
     # preparing for the first iteration
     # p[Nt] is never used so does not need to be initialized
@@ -209,15 +213,15 @@ def solve_adjoint(V, evo, control, opts):
         theta_km1.vector().set_local(evo[k-1])
 
         F = a(theta_km1, theta_k, p, control[k-1])
-          # + opts.penalty_term_combined(k-1, theta_km1, theta_k)
-        penalty = dt * opts.penalty_term_combined(k-1, theta_km1, theta_k)
+          # + penalty_term_combined(k-1, theta_km1, theta_k)
+        penalty = dt * penalty_term_combined(k-1, theta_km1, theta_k)
         if penalty:
             F += penalty
 
         if k < Nt:
             F += a(theta_k, theta_kp1, p_k, control[k])
-              # + opts.penalty_term_combined(k, theta_k, theta_kp1)
-            penalty = dt * opts.penalty_term_combined(k, theta_k, theta_kp1)
+              # + penalty_term_combined(k, theta_k, theta_kp1)
+            penalty = dt * penalty_term_combined(k, theta_k, theta_kp1)
             if penalty:
                 F += penalty
 
@@ -230,11 +234,11 @@ def solve_adjoint(V, evo, control, opts):
         except ValueError:
             A, b = dolfin.assemble_system(dolfin.lhs(dF), Constant(0)*v*dx)
 
-        if opts.beta_welding:
+        if beta_welding:
             # calculate total magnitude and apply PointSource
             magnitude = - magnitude_pre\
-                      * theta_k(opts.target_point) ** (opts.pow_ - 1)
-            point_source = dolfin.PointSource(V, opts.target_point, magnitude)
+                      * theta_k(target_point) ** (pow_ - 1)
+            point_source = dolfin.PointSource(V, target_point, magnitude)
             point_source.apply(b)
 
         dolfin.solve(A, p_km1.vector(), b)
