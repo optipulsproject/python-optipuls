@@ -115,7 +115,7 @@ def solve_forward(a, V, theta_init, control):
             The laser power coefficient for every time step. 
 
     Returns:
-        evolution: ndarray
+        evo: ndarray
             The coefficients of the calculated solution in the basis of
             the space V at each time step including the given initial state.
             
@@ -129,22 +129,22 @@ def solve_forward(a, V, theta_init, control):
     v = dolfin.TestFunction(V)
 
     Nt = len(control)
-    evolution = np.zeros((Nt+1, len(V.dofmap().dofs())))
+    evo = np.zeros((Nt+1, len(V.dofmap().dofs())))
 
     # preparing for the first iteration
     theta_k.assign(theta_init)
-    evolution[0] = theta_k.vector().get_local()
+    evo[0] = theta_k.vector().get_local()
 
     # solve forward, i.e. theta_k -> theta p_kp1, k = 0, 1, 2, ..., Nt-1
     for k in range(Nt):
         F = a(theta_k, theta_kp1, v, control[k])
         dolfin.solve(F == 0, theta_kp1)
-        evolution[k+1] = theta_kp1.vector().get_local()
+        evo[k+1] = theta_kp1.vector().get_local()
 
         # preparing for the next iteration
         theta_k.assign(theta_kp1)
 
-    return evolution
+    return evo
 
 
 def solve_adjoint(V, evo, control, opts):
