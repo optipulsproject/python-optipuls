@@ -22,24 +22,23 @@ args = parser.parse_args()
 dolfin.set_log_level(40)
 dolfin.parameters["form_compiler"]["quadrature_degree"] = 1
 
-
-# set optimization options
-# warning: changing of these values can currently break the optimization
-opts = OptimizationParameters()
-opts.beta_welding = core.beta_welding
-opts.threshold_temp = core.threshold_temp
-opts.target_point = core.target_point
-opts.pow_ = core.pow_
-opts.penalty_term_combined = core.penalty_term_combined
-opts.implicitness = core.implicitness
-
-
 # set up the problem
 problem = Problem()
+
+problem.beta_welding = core.beta_welding
+problem.threshold_temp = core.threshold_temp
+problem.target_point = core.target_point
+problem.pow_ = core.pow_
+problem.penalty_term_combined = core.penalty_term_combined
+problem.implicitness = core.implicitness
+
+problem.a = core.a
 problem.V = dolfin.FunctionSpace(mesh, "CG", 1)
 problem.V1 = dolfin.FunctionSpace(mesh, "DG", 0)
 problem.theta_init = dolfin.project(core.temp_amb, problem.V)
-problem.opts = opts
+
+problem.liquidus = 923.0
+problem.solidus = 858.0
 
 core.vhc.problem = problem
 core.kappa_rad.problem = problem

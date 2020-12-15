@@ -35,8 +35,7 @@ class Simulation():
         try:
             return self._evo_adj
         except AttributeError:
-            self._evo_adj = core.solve_adjoint(
-                    self.problem.V, self.evo, self.control, self.problem.opts)
+            self._evo_adj = self.problem.solve_adjoint(self.evo, self.control)
             return self._evo_adj
 
     @property
