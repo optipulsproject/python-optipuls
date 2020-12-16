@@ -35,7 +35,8 @@ class Simulation():
         try:
             return self._evo_adj
         except AttributeError:
-            self._evo_adj = self.problem.solve_adjoint(self.evo, self.control)
+            self._evo_adj = self.problem.solve_adjoint(
+                    self.evo, self.control, self.ps_magnitude)
             return self._evo_adj
 
     @property
@@ -43,8 +44,7 @@ class Simulation():
         try:
             return self._evo_vel
         except AttributeError:
-            self._evo_vel = core.compute_evo_vel(
-                    self.problem.V, self.problem.V1, self.evo)
+            self._evo_vel = self.problem.compute_evo_vel(self.evo)
             return self._evo_vel
 
     @property
@@ -60,7 +60,7 @@ class Simulation():
         try:
             return self._Dj_norm
         except AttributeError:
-            self._Dj_norm = core.norm(self.Dj)
+            self._Dj_norm = self.problem.norm(self.Dj)
             return self._Dj_norm
 
     @property
@@ -69,7 +69,10 @@ class Simulation():
             return self._penalty_velocity_vector
         except AttributeError:
             self._penalty_velocity_vector = core.vectorize_penalty_term(
-                    self.problem.V, self.evo, core.penalty_term_velocity)
+                    self.problem.V,
+                    self.evo,
+                    lambda k, theta_k, theta_kp1: core.integral2(
+                            self.problem.velocity(theta_k, theta_kp1)))
             return self._penalty_velocity_vector
 
     @property
@@ -87,7 +90,10 @@ class Simulation():
             return self._penalty_liquidity_vector
         except AttributeError:
             self._penalty_liquidity_vector = core.vectorize_penalty_term(
-                    self.problem.V, self.evo, core.penalty_term_liquidity)
+                    self.problem.V,
+                    self.evo,
+                    lambda k, theta_k, theta_kp1: core.integral2(
+                            self.problem.liquidity(theta_k, theta_kp1)))
             return self._penalty_liquidity_vector
 
     @property
@@ -105,13 +111,18 @@ class Simulation():
         try:
             return self._penalty_welding_total
         except AttributeError:
-            self._penalty_welding_total = core.penalty_welding(
-                    self.problem.V, self.evo, self.control)
+            self._penalty_welding_total = self.problem.penalty_welding(
+                    self.evo, self.control)
             return self._penalty_welding_total
 
     @property
     def penalty_control_total(self):
-        return .5 * core.beta_control * core.norm2(self.control - core.control_ref)
+        beta_control = self.problem.beta_control
+        norm2 = self.problem.norm2
+        control = self.control
+        control_ref = self.problem.control_ref
+
+        return .5 * beta_control * norm2(control - control_ref)
 
     @property
     def temp_target_point_vector(self):
@@ -119,32 +130,34 @@ class Simulation():
             return self._temp_target_point_vector
         except AttributeError:
             self._temp_target_point_vector = \
-                    core.temp_at_point_vector(
-                        self.problem. V, self.evo, self.problem.opts.target_point)
+                self.problem.temp_target_point_vector(self.evo)
             return self._temp_target_point_vector
 
-    @property
-    def temp_central_point_vector(self):
-        try:
-            return self._temp_central_point_vector
-        except AttributeError:
-            self._temp_central_point_vector = \
-                    core.temp_at_point_vector(
-                        self.problem. V, self.evo, central_point)
-            return self._temp_central_point_vector
 
     @property
     def energy_total(self):
         '''Total used energy [J].'''
-        return core.P_YAG * core.dt * sum(self.control)
+        P_YAG = self.problem.P_YAG
+        dt = self.problem.dt
+        control = self.control
+
+        return P_YAG * dt * sum(control)
 
     @property
     def J(self):
         try:
             return self._J_total
         except AttributeError:
-            self._J_total = core.cost_total(self.problem.V, self.evo, self.control)
+            self._J_total = self.problem.cost_total(self.evo, self.control)
             return self._J_total
+
+    @property
+    def ps_magnitude(self):
+        try:
+            return self._ps_magnitude
+        except AttributeError:
+            self._ps_magnitude = self.problem.compute_ps_magnitude(self.evo)
+            return self._ps_magnitude
 
     def report(self):
         print(f'''
@@ -159,6 +172,6 @@ penalty_welding_total:      {self.penalty_welding_total:.7e}
 cost_total:                 {self.J:.7e}
 
 energy_total:               {self.energy_total:9.6} [J]
-time_total:                 {core.T:9.6} [s]
+time_total:                 {self.problem.T:9.6} [s]
 temp_target_point_max:      {self.temp_target_point_vector.max():9.6} [K]
 ''')

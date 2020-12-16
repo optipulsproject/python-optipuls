@@ -9,64 +9,20 @@ from numpy.polynomial import Polynomial
 from matplotlib import pyplot as plt
 
 import splines as spl
-from coefficients import vhc, kappa_rad, kappa_ax
+# from coefficients import vhc, kappa_rad, kappa_ax
 from simulation import Simulation
 from mesh import x, ds
-
-
-# Space and time discretization parameters
-R = 0.0025
-R_laser = 0.0002
-Z = 0.0005
-T, Nt = 0.015, 300
-dt = T/Nt
-
-# Model constants
-temp_amb = 295.
-# enthalpy = Constant("397000")
-P_YAG = 2000.
-absorb = 0.135
-laser_pd = (absorb * P_YAG) / (np.pi * R_laser**2)
-implicitness = 1.
-
-convection_coeff = 20.
-radiation_coeff = 2.26 * 10**-9
-
-
-# Optimization parameters
-beta_control = 10**2
-beta_velocity = 10**18
-beta_welding = 10**-2
-beta_liquidity = 10**12
-velocity_max = 0.15
-target_point = dolfin.Point(0, .7*Z)
-central_point = dolfin.Point(0, 0)
-threshold_temp = 1000.
-pow_ = 20.
-
-control_ref = np.zeros(Nt)
-
-# Aggregate state
-liquidus = 923.0
-solidus = 858.0
-
 
 
 class DescendLoopException(Exception):
     pass
 
 
-def kappa(theta):
-    return dolfin.as_matrix(
-            [[kappa_rad(theta), Constant(0)],
-             [Constant(0), kappa_ax(theta)]])
-
-
-def laser_bc(control_k):
+def laser_bc(control_k, laser_pd):
     return laser_pd * Constant(control_k)
 
 
-def cooling_bc(theta):
+def cooling_bc(theta, temp_amb, convection_coeff, radiation_coeff):
     return - convection_coeff * (theta - temp_amb)\
            - radiation_coeff * (theta**4 - temp_amb**4)
 
@@ -80,13 +36,16 @@ def norm(dt, vector):
     '''Calculates L2[0,T] norm.'''
     return np.sqrt(norm2(dt, vector))
 
+def integral2(form):
+    return form**2 * x[0] * dx
 
-def avg(u_k, u_kp1, implicitness=implicitness):
+def avg(u_k, u_kp1, implicitness):
     return implicitness * u_kp1 + (1 - implicitness) * u_k
 
 
-def a(u_k, u_kp1, v, control_k):
-    u_avg = avg(u_k, u_kp1)
+def a(u_k, u_kp1, v, control_k,
+      vhc, kappa, cooling_bc, laser_bc, dt, implicitness):
+    u_avg = avg(u_k, u_kp1, implicitness)
 
     a_ = vhc(u_k) * (u_kp1 - u_k) * v * x[0] * dx\
        + dt * inner(kappa(u_k) * grad(u_avg), grad(v)) * x[0] * dx\
@@ -149,9 +108,7 @@ def solve_forward(a, V, theta_init, control):
     return evo
 
 
-def solve_adjoint(a, V, evo, control,
-                  beta_welding, target_point, threshold_temp,
-                  penalty_term_combined):
+def solve_adjoint(evo, control, ps_magnitude, target_point, a, V, j):
     '''Calculates the solution to the adjoint problem.
 
     The solution to the adjoint equation is calculated using the explicitly
@@ -159,7 +116,7 @@ def solve_adjoint(a, V, evo, control,
 
     For better understanding of the indeces see docs/indexing-diagram.txt.
 
-    Parameters:
+    Parameters: OUTDATED
         V: dolfin.FunctionSpace
             The FEM space of the problem being solved.
         evo: ndarray
@@ -195,37 +152,19 @@ def solve_adjoint(a, V, evo, control,
     Nt = len(control)
     evo_adj = np.zeros((Nt+1, len(V.dofmap().dofs())))
 
-    # PointSource's magnitute precalculation
-    if beta_welding:
-        sum_ = 0
-        for k in range(1, Nt+1):
-            theta_k.vector().set_local(evo[k])
-            sum_ += theta_k(target_point) ** pow_
-        p_norm = sum_ ** (1 / pow_)
-        magnitude_pre = beta_welding * (p_norm - threshold_temp)\
-                      * sum_ ** (1/pow_ - 1)
-
     # preparing for the first iteration
-    # p[Nt] is never used so does not need to be initialized
-    # the next line is for readability, can be omitted for performance
     theta_k.vector().set_local(evo[Nt])
 
     # solve backward, i.e. p_k -> p = p_km1, k = Nt, Nt-1, Nt-2, ..., 1
     for k in range(Nt, 0, -1):
         theta_km1.vector().set_local(evo[k-1])
 
-        F = a(theta_km1, theta_k, p, control[k-1])
-          # + penalty_term_combined(k-1, theta_km1, theta_k)
-        penalty = dt * penalty_term_combined(k-1, theta_km1, theta_k)
-        if penalty:
-            F += penalty
+        F = a(theta_km1, theta_k, p, control[k-1])\
+          + j(k-1, theta_km1, theta_k)
 
         if k < Nt:
-            F += a(theta_k, theta_kp1, p_k, control[k])
-              # + penalty_term_combined(k, theta_k, theta_kp1)
-            penalty = dt * penalty_term_combined(k, theta_k, theta_kp1)
-            if penalty:
-                F += penalty
+            F += a(theta_k, theta_kp1, p_k, control[k])\
+               + j(k, theta_k, theta_kp1)
 
 
         dF = dolfin.derivative(F, theta_k, v)
@@ -236,12 +175,9 @@ def solve_adjoint(a, V, evo, control,
         except ValueError:
             A, b = dolfin.assemble_system(dolfin.lhs(dF), Constant(0)*v*dx)
 
-        if beta_welding:
-            # calculate total magnitude and apply PointSource
-            magnitude = - magnitude_pre\
-                      * theta_k(target_point) ** (pow_ - 1)
-            point_source = dolfin.PointSource(V, target_point, magnitude)
-            point_source.apply(b)
+        # apply welding penalty as a point source
+        point_source = dolfin.PointSource(V, target_point, ps_magnitude[k-1])
+        point_source.apply(b)
 
         dolfin.solve(A, p_km1.vector(), b)
  
@@ -255,7 +191,7 @@ def solve_adjoint(a, V, evo, control,
     return evo_adj
 
 
-def Dj(V, evo_adj, control, control_ref, beta_welding, laser_pd):
+def Dj(evo_adj, control, V, control_ref, beta_control, beta_welding, laser_pd):
     '''Calculates the gradient of the cost functional for the given control.
 
 
@@ -285,7 +221,7 @@ def Dj(V, evo_adj, control, control_ref, beta_welding, laser_pd):
         p.vector().set_local(evo_adj[i])
         z[i] = dolfin.assemble(p * x[0] * ds(1))
     
-    Dj = beta_control * (control-control_ref) - laser_pd*z
+    Dj = beta_control * (control - control_ref) - laser_pd*z
 
     return Dj
 
@@ -360,7 +296,8 @@ def gradient_descent(simulation, iter_max=50, step_init=1, tolerance=10**-9):
     return descent
 
 
-def gradient_test(simulation, iter_max=15, eps_init=.1, diff_type='forward'):
+def gradient_test(simulation, dt,
+                  iter_max=15, eps_init=10**-6, diff_type='forward'):
     '''Checks the accuracy of the calculated gradient Dj.
 
     The finite difference for J w.r.t. a random normalized direction is compared
@@ -388,10 +325,11 @@ def gradient_test(simulation, iter_max=15, eps_init=.1, diff_type='forward'):
     '''
 
     print('Starting the gradient test...')
+
+    Nt = simulation.problem.Nt
     # np.random.seed(0)
     direction = np.random.rand(Nt)
-    direction /= norm(direction)
-    direction *= .0005 * T
+    direction /= norm(dt, direction)
 
     problem = simulation.problem
     D = simulation.Dj
@@ -434,74 +372,13 @@ def gradient_test(simulation, iter_max=15, eps_init=.1, diff_type='forward'):
     return epsilons, deltas
 
 
-def penalty_term_velocity(k, theta_k, theta_kp1, velocity_max=velocity_max):
-    theta_avg = avg(theta_k, theta_kp1, implicitness=.5)
-    grad_norm = ufl.sqrt(inner(grad(theta_avg), grad(theta_avg)) + DOLFIN_EPS)
-
-    func = (theta_kp1 - theta_k) / dt / grad_norm
-    # allow small negative values (velocity_max)
-    func += dolfin.Constant(velocity_max)
-    func *= conditional(le(func, 0.), 1., 0.)
-    # filter to the solidus-liquidus corridor
-    func *= conditional(
-            And(ge(theta_k, solidus), lt(theta_kp1, liquidus)), 1., 0.)
-    # invert the sign
-    func *= -1
-
-    form = func**2 * x[0] * dx
-
-    return form
-
-
-def penalty_term_liquidity(k, theta_k, theta_kp1, implicitness=implicitness):
-    '''Returns a UFL form corresponding to the liquidity penalty term.
-
-    Parameters:
-        theta_k: Function(V)
-            Function representing the state from the current time slice.
-        theta_kp1: Function(V)
-            Function representing the state from the next time slice.
-        implicitness: float
-            The weight of theta_kp1 in the expression. The global implicitness
-            parameter is used by default.
-
-    Returns:
-        form: UFL form
-            A valid UFL form for assembling.
-
-    '''
-    
-    theta_avg = avg(theta_k, theta_kp1, implicitness=1.)
-    func = theta_avg - Constant(solidus)
-    # filter to liquid parts
-    func *= conditional(ge(func, 0.), 1., 0.)
-
-    form = func**2 * x[0] * dx
-
-    return form
-
-
-def penalty_term_combined(k, theta_k, theta_kp1):
-    '''Provides a linear combination of different penalty terms as a UFL form
-    for solve_adjoint.'''
-    if k == Nt:
-        form = Constant(beta_liquidity) *\
-           penalty_term_liquidity(k, theta_k, theta_kp1, implicitness=1.)
-    else:
-        form = 0
-    form += Constant(beta_velocity) *\
-            penalty_term_velocity(k, theta_k, theta_kp1)
-
-    return form
-
-
-def penalty_welding(V, evo, control,
-                    target_point, threshold_temp, pow_):
+def penalty_welding(evo, control,
+                    V, beta_welding, target_point, threshold_temp, pow_):
     '''Penalty due to the maximal temperature at the target point.'''
 
     sum_ = 0
     theta = dolfin.Function(V)
-    for k in range(1, Nt+1):
+    for k in range(len(evo)):
         theta.vector().set_local(evo[k])
         sum_ += np.float_power(theta(target_point), pow_)
     norm = np.float_power(sum_, 1/pow_)
@@ -510,7 +387,7 @@ def penalty_welding(V, evo, control,
     return result
 
 
-def vectorize_penalty_term(V, evo, penalty_term):
+def vectorize_penalty_term(V, evo, penalty_term, *args, **kwargs):
     '''Takes a penalty_term and provides a vector of penalties at time steps.
 
     Parameters:
@@ -538,7 +415,7 @@ def vectorize_penalty_term(V, evo, penalty_term):
     theta_k.vector().set_local(evo[0])
     for k in range(Nt):
         theta_kp1.vector().set_local(evo[k+1])
-        penalty = penalty_term(k, theta_k, theta_kp1)
+        penalty = penalty_term(k, theta_k, theta_kp1, *args, **kwargs)
         if penalty:
             penalty_vector[k] = dolfin.assemble(penalty)
         theta_k.assign(theta_kp1)
@@ -546,25 +423,9 @@ def vectorize_penalty_term(V, evo, penalty_term):
     return penalty_vector
 
 
-def cost_total(V, evo, control):
-    '''Calculates the total cost of a given simulation.
+def temp_at_point_vector(evo, V, point):
+    Nt = len(evo) - 1
 
-    This function puts together all the penalties from different terms.
-
-    '''
-
-    # penalties from integral temrs
-    cost = dt * vectorize_penalty_term(V, evo, penalty_term_combined).sum()
-    # control penalty
-    cost += .5 * beta_control * norm2(control - control_ref)
-    # welding penalty
-    if beta_welding:
-        cost += penalty_welding(V, evo, control)
-
-    return cost
-
-
-def temp_at_point_vector(V, evo, point):
     theta_k = dolfin.Function(V)
     vector = np.zeros(Nt+1)
     for k in range(Nt+1):
@@ -574,7 +435,7 @@ def temp_at_point_vector(V, evo, point):
     return vector
 
 
-def velocity(theta_k, theta_kp1, velocity_max=velocity_max, implicitness=.5):
+def velocity(theta_k, theta_kp1, dt, liquidus, solidus, velocity_max):
     '''Provides the UFL form of the velocity function.
 
     Parameters:
@@ -609,7 +470,16 @@ def velocity(theta_k, theta_kp1, velocity_max=velocity_max, implicitness=.5):
     return form
 
 
-def compute_evo_vel(V, V1, evo):
+def liquidity(theta_k, theta_kp1, solidus, implicitness=1.):
+    theta_avg = avg(theta_k, theta_kp1, implicitness)
+    form = theta_avg - Constant(solidus)
+    # filter to liquid parts
+    form *= conditional(ge(form, 0.), 1., 0.)
+
+    return form
+
+
+def compute_evo_vel(evo, V, V1, dt, liquidus, solidus, velocity_max):
     '''Computes the velocity evolution.
 
     Parameters:
@@ -638,11 +508,34 @@ def compute_evo_vel(V, V1, evo):
     for k in range(Nt):
         theta_kp1.vector().set_local(evo[k+1])
 
-        form = velocity(theta_k, theta_kp1)
-        func = dolfin.project(velocity(theta_k, theta_kp1), V1)
+        func = dolfin.project(
+                velocity(
+                    theta_k, theta_kp1, dt, liquidus, solidus, velocity_max),
+                V1)
 
         evo_vel[k] = func.vector().get_local()
 
         theta_k.assign(theta_kp1)
 
     return evo_vel
+
+
+def compute_ps_magnitude(
+        evo, V, target_point, threshold_temp, beta_welding, pow_):
+    theta_kp1 = dolfin.Function(V)
+
+    Nt = len(evo) - 1
+    magnitude = np.zeros(Nt)
+
+    sum_ = 0
+    for k in range(0, Nt):
+        theta_kp1.vector().set_local(evo[k+1])
+        sum_ += theta_kp1(target_point) ** pow_
+        magnitude[k] = theta_kp1(target_point) ** (pow_ - 1)
+
+    p_norm = sum_ ** (1 / pow_)
+    magnitude_common = beta_welding * (p_norm - threshold_temp)\
+                     * sum_ ** (1/pow_ - 1)
+    magnitude *= - magnitude_common
+
+    return magnitude
