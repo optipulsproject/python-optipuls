@@ -387,7 +387,7 @@ def penalty_welding(evo, control,
     return result
 
 
-def vectorize_penalty_term(V, evo, penalty_term, *args, **kwargs):
+def vectorize_penalty_term(evo, V, penalty_term, *args, **kwargs):
     '''Takes a penalty_term and provides a vector of penalties at time steps.
 
     Parameters:

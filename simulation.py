@@ -1,4 +1,4 @@
-import core
+from core import integral2
 
 
 class Simulation():
@@ -68,10 +68,9 @@ class Simulation():
         try:
             return self._penalty_velocity_vector
         except AttributeError:
-            self._penalty_velocity_vector = core.vectorize_penalty_term(
-                    self.problem.V,
+            self._penalty_velocity_vector = self.problem.vectorize_penalty_term(
                     self.evo,
-                    lambda k, theta_k, theta_kp1: core.integral2(
+                    lambda k, theta_k, theta_kp1: integral2(
                             self.problem.velocity(theta_k, theta_kp1)))
             return self._penalty_velocity_vector
 
@@ -89,10 +88,9 @@ class Simulation():
         try:
             return self._penalty_liquidity_vector
         except AttributeError:
-            self._penalty_liquidity_vector = core.vectorize_penalty_term(
-                    self.problem.V,
+            self._penalty_liquidity_vector = self.problem.vectorize_penalty_term(
                     self.evo,
-                    lambda k, theta_k, theta_kp1: core.integral2(
+                    lambda k, theta_k, theta_kp1: integral2(
                             self.problem.liquidity(theta_k, theta_kp1)))
             return self._penalty_liquidity_vector
 

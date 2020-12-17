@@ -62,6 +62,10 @@ class Problem:
                 beta_welding=self.beta_welding,
                 pow_=self.pow_)
 
+    def vectorize_penalty_term(self, evo, penalty_term, *args, **kwargs):
+        return core.vectorize_penalty_term(
+                evo, self.V, penalty_term, *args, **kwargs)
+
     def velocity(self, theta_k, theta_kp1):
         return core.velocity(
                 theta_k, theta_kp1,
@@ -95,8 +99,7 @@ class Problem:
         return form
 
     def cost_total(self, evo, control):
-        j_vector = core.vectorize_penalty_term(
-                V=self.V,
+        j_vector = self.vectorize_penalty_term(
                 evo=evo,
                 penalty_term=self.j)
 
