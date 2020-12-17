@@ -50,9 +50,6 @@ class Problem:
                 self.V, self.V1, self.dt,
                 self.liquidus, self.solidus, self.velocity_max)
 
-    def gradient_test(self, simulation, **kwargs):
-        return core.gradient_test(simulation, self.dt, **kwargs)
-
     def compute_ps_magnitude(self, evo):
         return core.compute_ps_magnitude(
                 evo,

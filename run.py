@@ -11,6 +11,7 @@ from simulation import Simulation
 from problem import Problem
 from mesh import mesh, R, R_laser, Z
 import coefficients
+import optimization
 
 
 # parse command line arguments
@@ -84,7 +85,7 @@ control[:] = 0.5
 
 s = Simulation(problem, control)
 
-epsilons, deltas_fwd = problem.gradient_test(s, eps_init=10**-5, iter_max=15)
+epsilons, deltas_fwd = optimization.gradient_test(s, eps_init=10**-5, iter_max=15)
 vis.gradient_test_plot(epsilons, deltas_fwd)
 # descent = core.gradient_descent(s, iter_max=200, step_init=2**-25)
 
