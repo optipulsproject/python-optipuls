@@ -2,6 +2,7 @@ import json
 
 import numpy as np
 from matplotlib import pyplot as plt
+from dolfin import as_matrix, Constant
 
 import splines as spl
 
@@ -102,3 +103,9 @@ def construct_kappa_splines():
 
 vhc = construct_vhc_spline()
 kappa_rad, kappa_ax = construct_kappa_splines()
+
+
+def kappa(theta):
+    return as_matrix(
+            [[kappa_rad(theta), Constant(0)],
+             [Constant(0), kappa_ax(theta)]])
