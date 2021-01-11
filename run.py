@@ -78,16 +78,26 @@ problem.kappa = coefficients.kappa
 
 
 time_space = np.linspace(0, T, num=Nt, endpoint=True)
-control = laser.linear_rampdown(time_space)
-control[:] = 0.5
-# control[:Nt//2] = 1.
 
+print('Creating a test simulation.')
+test_control = 0.5 + 0.1 * np.sin(0.5 * time_space / np.pi)
+test_simulation = Simulation(problem, test_control)
 
-s = Simulation(problem, control)
+epsilons, deltas_fwd = optimization.gradient_test(
+        test_simulation, eps_init=10**-5, iter_max=15)
+vis.gradient_test_plot(
+        epsilons, deltas_fwd, outfile=args.scratch+'/gradient_test.png')
+print(f'Gradient test complete. See {args.scratch}/gradient_test.png')
 
-epsilons, deltas_fwd = optimization.gradient_test(s, eps_init=10**-5, iter_max=15)
-vis.gradient_test_plot(epsilons, deltas_fwd)
-# descent = core.gradient_descent(s, iter_max=200, step_init=2**-25)
+print('Creating an initial simulation.')
+control = np.zeros(Nt)
+simulation = Simulation(problem, control)
 
-# io.save_as_pvd(descent[-1].evo, problem.V, args.scratch+'/paraview/evo.pvd')
-# io.save_as_pvd(descent[-1].evo_vel, problem.V1, args.scratch+'/paraview/velocity/evo_vel.pvd')
+descent = optimization.gradient_descent(
+        simulation, iter_max=100, step_init=2**-25)
+
+vis.control_plot(
+        descent[-1].control,
+        labels=['Optimal Control'],
+        outfile=args.scratch+'/optimal_control.png')
+print(f'Gradient descent complete. See {args.scratch}/optimal_control.png')
