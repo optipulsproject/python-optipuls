@@ -157,9 +157,9 @@ class Simulation():
             self._ps_magnitude = self.problem.compute_ps_magnitude(self.evo)
             return self._ps_magnitude
 
+    @property
     def report(self):
-        print(f'''
-simulation report
+        return f'''simulation report
 =================
 
 penalty_control_total:      {self.penalty_control_total:.7e}
@@ -172,4 +172,4 @@ cost_total:                 {self.J:.7e}
 energy_total:               {self.energy_total:9.6} [J]
 time_total:                 {self.problem.T:9.6} [s]
 temp_target_point_max:      {self.temp_target_point_vector.max():9.6} [K]
-''')
+'''
