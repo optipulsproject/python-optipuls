@@ -68,7 +68,9 @@ class Simulation():
         try:
             return self._penalty_velocity_vector
         except AttributeError:
-            self._penalty_velocity_vector = self.problem.vectorize_penalty_term(
+            self._penalty_velocity_vector = \
+                self.problem.dt * self.problem.beta_velocity * \
+                self.problem.vectorize_penalty_term(
                     self.evo,
                     lambda k, theta_k, theta_kp1: integral2(
                             self.problem.velocity(theta_k, theta_kp1)))
@@ -88,7 +90,9 @@ class Simulation():
         try:
             return self._penalty_liquidity_vector
         except AttributeError:
-            self._penalty_liquidity_vector = self.problem.vectorize_penalty_term(
+            self._penalty_liquidity_vector = \
+                self.problem.dt * self.problem.beta_liquidity * \
+                self.problem.vectorize_penalty_term(
                     self.evo,
                     lambda k, theta_k, theta_kp1: integral2(
                             self.problem.liquidity(theta_k, theta_kp1)))
