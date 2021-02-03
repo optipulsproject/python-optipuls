@@ -3,6 +3,9 @@ import scipy.ndimage
 from matplotlib import pyplot as plt
 # from matplotlib import colors
 
+size_inches = (12, 8)
+metropolis_orange = "#EB811B"
+
 
 def control_plot(*controls, labels=None, outfile=None, **kwargs):
 
@@ -25,6 +28,25 @@ def control_plot(*controls, labels=None, outfile=None, **kwargs):
     ax.fill_between(x, controls[0], controls[-1], alpha=0.2, color='blue')
 
     ax.legend(loc=2)
+
+    plt.tight_layout()
+    if not outfile:
+        plt.show(**kwargs)
+    else:
+        plt.savefig(outfile, **kwargs)
+
+
+def optimal_control_plot(
+        optcontrol, title="Optimal control", outfile=None, **kwargs):
+
+    fig, ax = plt.subplots()
+    fig.set_size_inches(*size_inches)
+
+    ax.set_title(title)
+    x = np.arange(len(optcontrol))
+
+    ax.fill_between(x, optcontrol, alpha=0.2, color="blue", zorder=0)
+    ax.plot(x, optcontrol, color="blue", zorder=1)
 
     plt.tight_layout()
     if not outfile:
