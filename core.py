@@ -272,15 +272,31 @@ def vectorize_penalty_term(evo, V, penalty_term, *args, **kwargs):
 
 
 def temp_at_point_vector(evo, V, point):
+    '''Provides the temperature evolution at a given point.
+
+    Parameters:
+        evo: ndarray
+            The coefficients of the solution to the corresponding forward
+            problem in the basis of the space V (see solve_forward).
+        V: dolfin.FunctionSpace
+            The FEM space of the problem being solved.
+        point: dolfin.Point
+            The point to check temperature at. 
+
+    Returns:
+        temp_vector: ndarray
+            Contains temperatures at the given point for every time step.
+
+    '''
     Nt = len(evo) - 1
 
     theta_k = dolfin.Function(V)
-    vector = np.zeros(Nt+1)
+    temp_vector = np.zeros(Nt+1)
     for k in range(Nt+1):
         theta_k.vector().set_local(evo[k])
-        vector[k] = theta_k(point)
+        temp_vector[k] = theta_k(point)
 
-    return vector
+    return temp_vector
 
 
 def velocity(theta_k, theta_kp1, dt, liquidus, solidus, velocity_max):

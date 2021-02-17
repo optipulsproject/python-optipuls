@@ -136,6 +136,11 @@ class Simulation():
                 self.problem.temp_target_point_vector(self.evo)
             return self._temp_target_point_vector
 
+    def temp_at_point_vector(self, point):
+        '''Provides the temperature evolution at a given point.'''
+
+        return self.problem.temp_at_point_vector(self.evo, point)
+
 
     @property
     def energy_total(self):
