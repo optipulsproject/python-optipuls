@@ -44,7 +44,8 @@ class Simulation():
         try:
             return self._evo_vel
         except AttributeError:
-            self._evo_vel = self.problem.compute_evo_vel(self.evo)
+            self._evo_vel = self.problem.compute_evo_vel(
+                    self.evo, velocity_max=0.)
             return self._evo_vel
 
     @property

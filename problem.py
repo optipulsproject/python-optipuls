@@ -44,11 +44,11 @@ class Problem:
                 self.beta_welding,
                 self.laser_pd)
 
-    def compute_evo_vel(self, evo):
+    def compute_evo_vel(self, evo, velocity_max):
         return core.compute_evo_vel(
                 evo,
                 self.V, self.V1, self.dt,
-                self.liquidus, self.solidus, self.velocity_max)
+                self.liquidus, self.solidus, velocity_max)
 
     def compute_ps_magnitude(self, evo):
         return core.compute_ps_magnitude(
