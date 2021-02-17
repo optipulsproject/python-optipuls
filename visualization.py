@@ -42,7 +42,9 @@ def optimal_control_plot(
     fig, ax = plt.subplots()
     fig.set_size_inches(*size_inches)
 
-    ax.set_title(title)
+    if title:
+        ax.set_title(title)
+
     x = np.arange(len(optcontrol))
 
     ax.fill_between(x, optcontrol, alpha=0.2, color="blue", zorder=0)
@@ -103,7 +105,7 @@ def gradient_test_plot(eps, *deltas, labels=None, outfile=None, **kwargs):
     '''
 
     fig, ax = plt.subplots()
-    fig.set_size_inches(12,8)
+    fig.set_size_inches(*size_inches)
     
     ax.set_xscale('log')
     ax.set_yscale('log')
