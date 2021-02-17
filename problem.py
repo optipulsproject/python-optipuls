@@ -113,3 +113,11 @@ class Problem:
                 evo,
                 V=self.V,
                 point=self.target_point)
+
+    def temp_at_point_vector(self, evo, point):
+        '''Provides the temperature evolution at a given point.'''
+
+        return core.temp_at_point_vector(
+                evo,
+                V=self.V,
+                point=point)
