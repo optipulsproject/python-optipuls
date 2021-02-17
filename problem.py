@@ -107,6 +107,8 @@ class Problem:
         return cost
 
     def temp_target_point_vector(self, evo):
+        '''Provides the temperature evolution at the target_point.'''
+
         return core.temp_at_point_vector(
                 evo,
                 V=self.V,
