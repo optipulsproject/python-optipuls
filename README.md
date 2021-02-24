@@ -1,11 +1,16 @@
-FEniCS model for the heat equation with phase transition
-========================================================
+OptiPuls: numerical model for single spot pulsed laser beam welding
+===================================================================
 
-[Simulation Based Optimization of the Time-Dependent Pulse Power for Laser Beam Welding of Aluminum Alloys in Order to Avoid Hot Cracks](https://www.tu-chemnitz.de/mathematik/part_dgl/projects/optipuls/index.en.php)
+This repository contains a numerical model for simulation and optimization of the single spot pulsed laser beam welding of aluminium alloys. Its implementation relies on the [FEniCS computing platform](https://fenicsproject.org/). 
 
-This repository contains a FEM numerical model for the single spot pulsed laser beam welding of aluminium alloys.
+---
 
-Author: Dmytro Strelnikov <dmytro.strelnikov@math.tu-chemnitz.de>
+**Author:** Dmytro Strelnikov <dmytro.strelnikov@math.tu-chemnitz.de>  
+**Funding:** Funding: Project IGF 20.826B (DVS I2.3005) in Forschungsvereinigung Schweißen und verwandte Verfahren e.V. of the [Deutschen Verbandes für Schweißen und verwandte Verfahren e.V.](https://www.die-verbindungs-spezialisten.de/)  
+**Project page:** [Simulation Based Optimization of the Time-Dependent Pulse Power for Laser Beam Welding of Aluminum Alloys in Order to Avoid Hot Cracks](https://www.tu-chemnitz.de/mathematik/part_dgl/projects/optipuls/index.en.php)
+
+---
+
 
 ![OptiPuls-preview](https://strelnikov.xyz/projects/OptiPuls/OptiPuls-preview.mp4)
 
@@ -31,10 +36,8 @@ Use the following command to list all of such commits:
 git show -s --tags=experiments --decorate --abbrev-commit --pretty=medium
 ```
 
-Notice that some tools work incorrect with "hanging" commits under no branch even so they are still accessible by tags.
 
-
-## Running numerical experiments
+## Running simulations and optimizations
 
 ### On bare metal
 
@@ -43,14 +46,14 @@ If your host system provides the dependencies then you can run a simulation by
 python3 run.py [--scratch /path/to/scratch]
 ```
 
-where `/path/to/scratch` is the desired directory for the simulation artifacts such as plots, ParaView files, dumped NumPy arrays, log files, etc. This variable is also used by the script `calculate.sh`.
+where `/path/to/scratch` is an optional path to the desired directory for the simulation artifacts such as plots, ParaView files, dumped NumPy arrays, log files, etc.
 
 For the up-to-date list of command line arguments run `python3 run.py --help`.
 
 
 ### In a docker container
 
-Assuming that `/scratch/optipuls` is the desired location for the simulation artifacts and the dijitso cache, the following command will run a simulation in the FEniCS docker container:
+Assuming that `/scratch/optipuls` is the desired location for the simulation artifacts and the dijitso cache, the following command will run a simulation (described in the file `run.py`) in the FEniCS docker container:
 ```
 $ docker run \
   -v $(pwd):/home/fenics/shared \
@@ -62,10 +65,9 @@ $ docker run \
 
 ## Development
 
-The development in this repo is carried using of a free variation of [git-flow](https://nvie.com/posts/a-successful-git-branching-model/) branching model considering the difference between scientific and enterprise software.
+The essential development history is reflected by the branch `develop` and various feature branches. The bleeding-edge state of the code is usually reflected by the branch `experimental`. Separate branches are used for preparing talks and publications.
 
-In particular, it means:
 
-1. The `master` branch is used only for releases (e.g. freezing the code to refer to it in a publication, internal documentation, etc) and is not used to carry the main development.
-2. The essential development history is reflected by the branch `develop` and various feature branches.
-3. The bleeding-edge state of the code is usually reflected by the branch `experimental`.
+## License
+
+The sorce code is licensed under the terms of [GNU GPLv3](https://www.gnu.org/licenses/gpl-3.0.en.html).
