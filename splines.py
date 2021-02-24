@@ -1,3 +1,23 @@
+'''Provides a set of classes to define the PDE coefficients as splines. 
+
+Classes:
+    Spline:
+        A class for splines difened on the whole real line.
+    HermiteSpline(Spline):
+        Implements a container for a Hermite spline.
+    NaiveHermiteSpline(HermiteSpline):
+        Implements a naive hermite spline which derivatives the knots are not
+        given but calculated using numpy.gradient.
+
+Functions:
+    hermine_interpolating_polynomial:
+        Generates Hermite interpolating polynomial for the given interval,
+        values, and derivatives at the ends.
+    load:
+        Loads a previously dumped Spline object.
+
+'''
+
 import numbers
 
 import numpy as np
@@ -102,7 +122,13 @@ class Spline:
 
 
 class HermiteSpline(Spline):
-    # https://en.wikipedia.org/wiki/Cubic_Hermite_spline
+    '''Implements a container for a Hermite spline.
+
+    References:
+    - https://en.wikipedia.org/wiki/Cubic_Hermite_spline
+
+    '''
+
     def __init__(self, knots, values, derivatives,
                  extrapolation_left='constant',
                  extrapolation_right='constant'):
@@ -143,6 +169,11 @@ class HermiteSpline(Spline):
 
 
 class NaiveHermiteSpline(HermiteSpline):
+    '''Implements a naive Hermite spline which derivatives the knots are not
+    given but calculated using numpy.gradient.
+
+    '''
+
     def __init__(self, knots, values,
                  extrapolation_left='constant',
                  extrapolation_right='constant'):
