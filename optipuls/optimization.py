@@ -48,7 +48,7 @@ def gradient_descent(simulation, iter_max=50, step_init=1, tolerance=10**-9):
                     simulation.control - step * simulation.Dj).clip(0, 1)
                 if np.allclose(control_trial, simulation.control):
                     raise DescendLoopException
-                simulation_trial = Simulation(problem, control_trial)
+                simulation_trial = simulation.spawn(control_trial)
 
                 if simulation_trial.J < simulation.J: break
                 print(f'{i:3}.{j:<2} {step:14.7e} '
@@ -127,14 +127,14 @@ def gradient_test(simulation,
         for eps in (eps_init * 2**-k for k in range(iter_max)):
             if diff_type == 'forward':
                 control_ = (simulation.control + eps * direction).clip(0, 1)
-                simulation_ = Simulation(problem, control_)
+                simulation_ = simulation.spawn(control_)
                 diff = (simulation_.J - simulation.J) / eps
 
             elif diff_type == 'two_sided':
                 control_ = (control - eps * direction).clip(0, 1)
-                simulation_ = Simulation(problem, control_)
+                simulation_ = simulation.spawn(control_)
                 control__ = (control + eps * direction).clip(0, 1)
-                simulation__ = Simulation(problem, control__)
+                simulation__ = simulation.spawn(control__)
                 diff = (simulation__.J - simulation_.J) / (2 * eps)
 
             delta_abs = inner_product - diff
