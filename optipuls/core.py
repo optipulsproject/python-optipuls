@@ -1,15 +1,11 @@
-import json
-
 import dolfin
 from dolfin import dx, Constant, DOLFIN_EPS
 import ufl
 from ufl import inner, grad, conditional, ge, gt, lt, le, And
 import numpy as np
-from numpy.polynomial import Polynomial
 from matplotlib import pyplot as plt
 
-import splines as spl
-from mesh import x, ds
+from .mesh import x, ds
 
 
 def laser_bc(control_k, laser_pd):

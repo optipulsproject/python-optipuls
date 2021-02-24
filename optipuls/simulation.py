@@ -1,4 +1,4 @@
-from core import integral2
+from .core import integral2
 
 
 class Simulation():

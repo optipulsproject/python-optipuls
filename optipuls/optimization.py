@@ -1,6 +1,6 @@
 import numpy as np
 
-from simulation import Simulation
+from .simulation import Simulation
 
 
 class DescendLoopException(Exception):
