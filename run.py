@@ -4,14 +4,12 @@ import dolfin
 from dolfin import Constant
 import numpy as np
 
-import core
-import visualization as vis
-from utils import io, laser
-from simulation import Simulation
-from problem import Problem
-from mesh import mesh, R, R_laser, Z
-import coefficients
-import optimization
+import optipuls.visualization as vis
+from optipuls.simulation import Simulation
+from optipuls.problem import Problem
+from optipuls.mesh import mesh, R, R_laser, Z
+import optipuls.coefficients as coefficients
+import optipuls.optimization as optimization
 
 
 # parse command line arguments
