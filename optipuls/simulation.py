@@ -1,4 +1,4 @@
-from core import integral2
+from .core import integral2
 
 
 class Simulation():
@@ -183,3 +183,8 @@ energy_total:               {self.energy_total:9.6} [J]
 time_total:                 {self.problem.T:9.6} [s]
 temp_target_point_max:      {self.temp_target_point_vector.max():9.6} [K]
 '''
+
+
+    def spawn(self, control):
+        '''Spawns a new simulation instance based for the same problem.'''
+        return Simulation(self.problem, control)

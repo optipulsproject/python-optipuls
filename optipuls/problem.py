@@ -1,4 +1,4 @@
-import core
+from . import core
 
 class Problem:
     def __init__(self):

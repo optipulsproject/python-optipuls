@@ -4,7 +4,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from dolfin import as_matrix, Constant
 
-import splines as spl
+from . import splines as spl
 
 
 x_sol = 858.
