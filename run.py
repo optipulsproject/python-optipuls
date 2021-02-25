@@ -10,6 +10,7 @@ from optipuls.problem import Problem
 from optipuls.mesh import mesh, R, R_laser, Z
 import optipuls.coefficients as coefficients
 import optipuls.optimization as optimization
+from optipuls.time import TimeDomain
 
 
 # parse command line arguments
@@ -24,8 +25,6 @@ dolfin.set_log_level(40)
 dolfin.parameters["form_compiler"]["quadrature_degree"] = 1
 
 
-T, Nt = 0.015, 30
-dt = T/Nt
 
 P_YAG = 2000.
 absorb = 0.135
@@ -35,9 +34,8 @@ laser_pd = (absorb * P_YAG) / (np.pi * R_laser**2)
 # set up the problem
 problem = Problem()
 
-problem.T = T
-problem.Nt = Nt
-problem.dt = dt
+time_domain = TimeDomain(0.015, 30)
+problem.time_domain = time_domain
 
 problem.P_YAG = P_YAG
 problem.laser_pd = laser_pd
@@ -50,7 +48,7 @@ problem.liquidus = 923.0
 problem.solidus = 858.0
 
 # optimization parameters
-problem.control_ref = np.zeros(Nt)
+problem.control_ref = np.zeros(time_domain.Nt)
 problem.beta_control = 10**2
 problem.beta_velocity = 10**18
 problem.velocity_max = 0.15
@@ -75,10 +73,8 @@ problem.vhc = coefficients.vhc
 problem.kappa = coefficients.kappa
 
 
-time_space = np.linspace(0, T, num=Nt, endpoint=True)
-
 print('Creating a test simulation.')
-test_control = 0.5 + 0.1 * np.sin(0.5 * time_space / np.pi)
+test_control = 0.5 + 0.1 * np.sin(0.5 * time_domain.timeline / np.pi)
 test_simulation = Simulation(problem, test_control)
 
 epsilons, deltas_fwd = optimization.gradient_test(
@@ -88,7 +84,7 @@ vis.gradient_test_plot(
 print(f'Gradient test complete. See {args.scratch}/gradient_test.png')
 
 print('Creating an initial simulation.')
-control = np.zeros(Nt)
+control = np.zeros(time_domain.Nt)
 simulation = Simulation(problem, control)
 
 descent = optimization.gradient_descent(

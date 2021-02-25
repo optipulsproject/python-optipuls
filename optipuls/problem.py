@@ -5,10 +5,10 @@ class Problem:
         pass
 
     def norm2(self, vector):
-        return core.norm2(self.dt, vector)
+        return core.norm2(self.time_domain.dt, vector)
 
     def norm(self, vector):
-        return core.norm(self.dt, vector)
+        return core.norm(self.time_domain.dt, vector)
 
     def solve_forward(self, control):
         return core.solve_forward(self.a, self.V, self.theta_init, control)
@@ -25,7 +25,7 @@ class Problem:
         return core.a(
                 u_k, u_kp1, v, control_k,
                 self.vhc, self.kappa, self.cooling_bc, self.laser_bc,
-                self.dt, self.implicitness)
+                self.time_domain.dt, self.implicitness)
 
     def laser_bc(self, control_k):
         return core.laser_bc(control_k, self.laser_pd)
@@ -47,7 +47,7 @@ class Problem:
     def compute_evo_vel(self, evo, velocity_max):
         return core.compute_evo_vel(
                 evo,
-                self.V, self.V1, self.dt,
+                self.V, self.V1, self.time_domain.dt,
                 self.liquidus, self.solidus, velocity_max)
 
     def compute_ps_magnitude(self, evo):
@@ -66,7 +66,7 @@ class Problem:
     def velocity(self, theta_k, theta_kp1):
         return core.velocity(
                 theta_k, theta_kp1,
-                dt=self.dt,
+                dt=self.time_domain.dt,
                 liquidus=self.liquidus,
                 solidus=self.solidus,
                 velocity_max=self.velocity_max)
@@ -86,10 +86,10 @@ class Problem:
                 pow_=self.pow_)
 
     def j(self, k, theta_k, theta_kp1):
-        form = self.dt * self.beta_velocity\
+        form = self.time_domain.dt * self.beta_velocity\
              * core.integral2(self.velocity(theta_k, theta_kp1))
 
-        if k == self.Nt:
+        if k == self.time_domain.Nt:
             form += dt * self.beta_liquidity\
                   * core.integral2(self.liquidity(theta_k, theta_kp1))
 

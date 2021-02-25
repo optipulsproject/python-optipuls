@@ -107,8 +107,8 @@ def gradient_test(simulation,
 
     print('Starting the gradient test...')
 
-    Nt = simulation.problem.Nt
-    dt = simulation.problem.dt
+    Nt = simulation.problem.time_domain.Nt
+    dt = simulation.problem.time_domain.dt
     # np.random.seed(0)
     direction = np.random.rand(Nt)
     direction /= simulation.problem.norm(direction)
