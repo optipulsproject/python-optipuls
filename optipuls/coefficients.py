@@ -1,111 +1,132 @@
-import json
+'''
+This module constructs the temperature-dependent coefficients of the
+quasi-linear heat equation using spline fitting to the given reference table
+values.
+
+The following functions are constructed for a given material:
+- volumetric heat capacity
+- radial thermal conductivity
+- axial thermal conductivity
+
+'''
 
 import numpy as np
-from matplotlib import pyplot as plt
-from dolfin import as_matrix, Constant
 
 from . import splines as spl
 
 
-x_sol = 858.
-x_liq = 923.
-x_mid = 0.5 * (x_sol + x_liq)
-
-L = 397000 * 2540
+def construct_vhc_spline(material):
+    '''Makes spline fitting of the volumetric heat capacity coefficient for a
+    given material.'''
 
 
-with open('material.json') as file:
-    material = json.load(file)
+    melting_enthalpy = material.melting_enthalpy
+    solidus = material.solidus
+    liquidus = material.liquidus
+    mid = 0.5 * (solidus + liquidus)
+    knots = material.knots
+    heat_capacity = material.heat_capacity
+    density = material.density
 
-knots_sol = np.array(material['heat capacity']['knots'][:7])
-c_sol = np.array(material['heat capacity']['values'][:7])
-rho_sol = np.array(material['density']['values'][:7])
-kappa_sol = np.array(
-        material['thermal conductivity']['radial']['values'][:7])
+    # filter to the values in the solid state
+    knots_solid = [k for k in knots if k <= solidus]
+    density_solid = [d for (d,k) in zip(density,knots) if k <= solidus]
+    vhc_solid = [c*d for (c,d,k) in zip(heat_capacity,density,knots) if k <= solidus]
 
+    # filter to the values in the liquid state
+    knots_liquid = [k for k in knots if k >= liquidus]
+    density_liquid = [d for (d,k) in zip(density,knots) if k >= liquidus]
+    vhc_liquid = [c*d for (c,d,k) in zip(heat_capacity,density,knots) if k >= liquidus]
 
-knots_liq = np.array(material['heat capacity']['knots'][-3:])
-c_liq = np.array(material['heat capacity']['values'][-3:])
-rho_liq = np.array(material['density']['values'][-3:])
-kappa_rad_liq = np.array(
-        material['thermal conductivity']['radial']['values'][-1:])
-kappa_ax_liq = np.array(
-        material['thermal conductivity']['axial']['values'][-1:])
+    # apply linear fitting
+    k_solid, b_solid = np.polyfit(knots_solid, vhc_solid, deg=1)
+    k_liquid, b_liquid = np.polyfit(knots_liquid, vhc_liquid, deg=1)
 
+    # interpolate the solidus-liquidus corridor with a cubic polynomial
+    polynomial_mid = spl.hermine_interpolating_polynomial(
+            knots=[solidus, liquidus],
+            values=[k_solid * solidus + b_solid, k_liquid * liquidus + b_liquid],
+            derivatives=[k_solid, k_liquid])
 
-def construct_vhc_spline():
-    vhc_sol = c_sol * rho_sol
-    k_sol, b_sol = np.polyfit(knots_sol, vhc_sol, deg=1)
-
-    vhc_liq = c_liq * rho_liq
-    k_liq, b_liq = np.polyfit(knots_liq, vhc_liq, deg=1)
+    # approximate the density at the middle point linearly and
+    # evaluate the volumetric melting enthalpy
+    knot_left = knots_solid[-1]
+    density_left = density_solid[-1]
+    knot_right = knots_liquid[0]
+    density_right = density_liquid[0]
+    density_mid = density_left + (density_right - density_left)\
+                  * (mid - knot_right) / (knot_left - knot_right)
+    melting_enthalpy_volumetric = melting_enthalpy * density_mid
     
-    pol_mid = spl.hermine_interpolating_polynomial(
-            knots=[x_sol, x_liq],
-            values=[k_sol * x_sol + b_sol, k_liq * x_liq + b_liq],
-            derivatives=[k_sol, k_liq])
-    
-    I = pol_mid.integ()(x_liq) - pol_mid.integ()(x_sol)
-    h = 2 * (L - I) / (x_liq - x_sol)
+    # calculate the integral of the previously interpolated polynomial
+    # over the solidus-liquidus corridor and evaluate the needed correction
+    # to reach specified volumetric melting enthalpy value
+    I = polynomial_mid.integ()(liquidus) - polynomial_mid.integ()(solidus)
+    h = 2 * (melting_enthalpy_volumetric - I) / (liquidus - solidus)
 
-    pol_left = spl.hermine_interpolating_polynomial(
-            knots=[x_sol, x_mid],
+    # generate left and right cubic polynomials for correction
+    # preserving smoothness
+    polynomial_left = spl.hermine_interpolating_polynomial(
+            knots=[solidus, mid],
             values=[0, h],
             derivatives=[0, 0])
-    pol_right = spl.hermine_interpolating_polynomial(
-            knots=[x_mid, x_liq],
+    polynomial_right = spl.hermine_interpolating_polynomial(
+            knots=[mid, liquidus],
             values=[h, 0],
             derivatives=[0, 0])
 
+    # construct the final spline (including correction)
+    # by specifying its knots and coefficients explicitly
     vhc_spline = spl.Spline(
-            [x_sol, x_mid, x_liq],
+            [solidus, mid, liquidus],
             [
-            [b_sol, k_sol, 0, 0],
-            pol_mid.coef + pol_left.coef,
-            pol_mid.coef + pol_right.coef,
-            [b_liq, k_liq, 0, 0]
+                [b_solid, k_solid, 0, 0],
+                polynomial_mid.coef + polynomial_left.coef,
+                polynomial_mid.coef + polynomial_right.coef,
+                [b_liquid, k_liquid, 0, 0]
             ])
 
     return vhc_spline
 
 
-def construct_kappa_splines():
-    k_sol, b_sol = np.polyfit(knots_sol, kappa_sol, deg=1)
+def construct_kappa_spline(material, direction):
+    '''Makes spline fitting of either radial or axial thermal conductivity
+    coefficient (kappa) for a given material.'''
 
-    pol_mid_rad = spl.hermine_interpolating_polynomial(
-            knots=[x_sol, x_liq],
-            values=[k_sol * x_sol + b_sol, kappa_rad_liq[0]],
-            derivatives=[k_sol, 0])
+    solidus = material.solidus
+    liquidus = material.liquidus
+    mid = 0.5 * (solidus + liquidus)
+    knots = material.knots
 
-    kappa_rad_spline = spl.Spline(
-            [x_sol, x_liq],
+    if direction == 'rad':
+        kappa = material.kappa_rad
+    elif direction == 'ax':
+        kappa = material.kappa_ax
+
+    # filter to the values in the solid state
+    knots_solid = [k for k in knots if k <= solidus]
+    kappa_solid = [kap for (kap,k) in zip(kappa,knots) if k <= solidus]
+
+    # filter to the values in the liquid state
+    knots_liquid = [k for k in knots if k >= liquidus]
+    kappa_liquid = [kap for (kap,k) in zip(kappa,knots) if k >= liquidus]
+
+    # apply linear fitting
+    k_solid, b_solid = np.polyfit(knots_solid, kappa_solid, deg=1)
+    k_liquid, b_liquid = np.polyfit(knots_liquid, kappa_liquid, deg=1)
+
+    polynomial_mid = spl.hermine_interpolating_polynomial(
+            knots=[solidus, liquidus],
+            values=[k_solid * solidus + b_solid, k_liquid * liquidus + b_liquid],
+            derivatives=[k_solid, k_liquid])
+
+    # construct the final spline by specifying its knots and coefficients
+    kappa_spline = spl.Spline(
+            [solidus, liquidus],
             [
-            [b_sol, k_sol, 0, 0],
-            pol_mid_rad.coef,
-            [kappa_rad_liq[0], 0, 0, 0]
+                [b_solid, k_solid, 0, 0],
+                polynomial_mid.coef,
+                [b_liquid, k_liquid, 0, 0]
             ])
 
-    pol_mid_ax = spl.hermine_interpolating_polynomial(
-            knots=[x_sol, x_liq],
-            values=[k_sol * x_sol + b_sol, kappa_ax_liq[0]],
-            derivatives=[k_sol, 0])
-
-    kappa_ax_spline = spl.Spline(
-            [x_sol, x_liq],
-            [
-            [b_sol, k_sol, 0, 0],
-            pol_mid_ax.coef,
-            [kappa_ax_liq[0], 0, 0, 0]
-            ])
-
-    return kappa_rad_spline, kappa_ax_spline
-
-
-vhc = construct_vhc_spline()
-kappa_rad, kappa_ax = construct_kappa_splines()
-
-
-def kappa(theta):
-    return as_matrix(
-            [[kappa_rad(theta), Constant(0)],
-             [Constant(0), kappa_ax(theta)]])
+    return kappa_spline
