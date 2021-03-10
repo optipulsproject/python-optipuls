@@ -1,7 +1,7 @@
 import argparse
 
 import dolfin
-from dolfin import Constant
+from dolfin import Constant, as_matrix
 import numpy as np
 
 import optipuls.visualization as vis
@@ -9,6 +9,7 @@ from optipuls.simulation import Simulation
 from optipuls.problem import Problem
 from optipuls.mesh import mesh, R, R_laser, Z
 import optipuls.coefficients as coefficients
+import optipuls.material as material
 import optipuls.optimization as optimization
 from optipuls.time import TimeDomain
 
@@ -65,13 +66,24 @@ problem.V1 = dolfin.FunctionSpace(mesh, "DG", 0)
 problem.theta_init = dolfin.project(problem.temp_amb, problem.V)
 
 
-coefficients.vhc.problem = problem
-coefficients.kappa_rad.problem = problem
-coefficients.kappa_ax.problem = problem
+# read the material properties and initialize equation coefficients
+dummy_material = material.from_file('materials/dummy.json')
 
-problem.vhc = coefficients.vhc
-problem.kappa = coefficients.kappa
+vhc = coefficients.construct_vhc_spline(dummy_material)
+kappa_rad = coefficients.construct_kappa_spline(dummy_material, 'rad')
+kappa_ax = coefficients.construct_kappa_spline(dummy_material, 'ax')
 
+# leth the spline object know about the functional space
+# in order to generate a UFL-form
+# a dull solution until we have a better one
+vhc.problem = problem
+kappa_rad.problem = problem
+kappa_ax.problem = problem
+
+problem.vhc = vhc
+problem.kappa = lambda theta: as_matrix(
+                    [[kappa_rad(theta), Constant(0)],
+                     [Constant(0), kappa_ax(theta)]])
 
 print('Creating a test simulation.')
 test_control = 0.5 + 0.1 * np.sin(0.5 * time_domain.timeline / np.pi)
