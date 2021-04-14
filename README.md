@@ -12,7 +12,7 @@ This repository contains a numerical model for simulation and optimization of th
 ---
 
 
-![OptiPuls-preview](https://strelnikov.xyz/projects/OptiPuls/OptiPuls-preview.mp4)
+![OptiPuls-preview](assets/3d_resized.png)
 
 
 ## Requirements
