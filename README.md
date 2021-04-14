@@ -22,21 +22,6 @@ A working [FEniCS](https://fenics.readthedocs.io/en/latest/installation.html) se
 One of the easy ways to satisfy the dependencies would be using the official [FEniCS docker images](https://fenics.readthedocs.io/projects/containers/en/latest/).
 
 
-## Numerical experiments
-
-Some commits are tagged as `experiments/*` and typically have neither children nor branches pointing at them. These commits are supposed to represent fully reproducible numerical experiments/simulations. The experiment setting is normally explained in the commit message.
-
-The following command is used to tag a certain commit as an experiment:
-```
-git tag experiments/$(git rev-parse --short HEAD)
-```
-
-Use the following command to list all of such commits:
-```
-git show -s --tags=experiments --decorate --abbrev-commit --pretty=medium
-```
-
-
 ## Running simulations and optimizations
 
 ### On bare metal
@@ -60,6 +45,21 @@ $ docker run \
   -v /scratch/optipuls/cache/dijitso:/home/fenics/.cache/dijitso \
   -v /scratch/optipuls:/scratch \
   quay.io/fenicsproject/stable:latest "cd shared && mkdir -p /scratch/$(git rev-parse --short HEAD) && python3 run.py --scratch /scratch/$(git rev-parse --short HEAD)"
+```
+
+
+## Reproducing numerical experiments
+
+Some commits are tagged as `experiments/*` and typically have neither children nor branches pointing at them. These commits are supposed to represent fully reproducible numerical experiments/simulations. The experiment setting is normally explained in the commit message.
+
+The following command is used to tag a certain commit as an experiment:
+```
+git tag experiments/$(git rev-parse --short HEAD)
+```
+
+Use the following command to list all of such commits:
+```
+git show -s --tags=experiments --decorate --abbrev-commit --pretty=medium
 ```
 
 
