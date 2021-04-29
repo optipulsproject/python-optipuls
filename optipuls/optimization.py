@@ -9,7 +9,12 @@ class DescendLoopException(Exception):
 class DescendToleranceException(Exception):
     pass
 
-def gradient_descent(simulation, iter_max=50, step_init=1, tolerance=10**-9):
+
+def gradient_descent(simulation,
+                     iter_max=50,
+                     step_init=1,
+                     tolerance=10**-9,
+                     beta=.5):
     '''Runs the gradient descent procedure.
 
     Parameters:
@@ -44,23 +49,25 @@ def gradient_descent(simulation, iter_max=50, step_init=1, tolerance=10**-9):
             while True:
                 if step * simulation.Dj_norm < tolerance:
                     raise DescendToleranceException
-                control_trial = (
-                    simulation.control - step * simulation.Dj).clip(0, 1)
+
+                control_trial = (simulation.control - step * simulation.Dj).clip(0, 1)
+
                 if np.allclose(control_trial, simulation.control):
                     raise DescendLoopException
+
                 simulation_trial = simulation.spawn(control_trial)
 
                 if simulation_trial.J < simulation.J: break
-                print(f'{i:3}.{j:<2} {step:14.7e} '
-                      f'{simulation_trial.J:14.7e}  {13*"-"}')
+
+                print(f'{i:3}.{j:<2} {step:14.7e} {simulation_trial.J:14.7e}  {13*"-"}')
                 j += 1
-                step /= 2
+                step *= beta
 
             simulation = simulation_trial
             print(f'{i:3}.{j:<2} {step:14.7e} '
                   f'{simulation.J:14.7e} {simulation.Dj_norm:14.7e}')
             descent.append(simulation)
-            step *= 2
+            step /= beta
 
         else:
             print('Maximal number of iterations was reached.')
