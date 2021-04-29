@@ -42,12 +42,13 @@ def gradient_descent(simulation,
         step = step_init
         problem = simulation.problem
 
-        print(f'{"i.j " :>6} {"s":>14} {"J":>14} {"norm(Dj)":>14}')
-        print(f'{simulation.J:36.7e} {simulation.Dj_norm:14.7e}')
+        print(f"{'i':>3}.{'j':<2}{'step':>15}{'J':>15}{'norm(Dj)':>15}")
+        print(f"{simulation.J:36.7e}{simulation.Dj_norm:15.7e}")
 
-        for i in range(iter_max):
+        for i in range(1, iter_max + 1):
             j = 0
             while True:
+                print(f"{i:3}.{j:<2}{step:15.7e}", end='', flush=True)
                 if step * simulation.Dj_norm < tolerance:
                     raise DescendToleranceException
 
@@ -62,32 +63,30 @@ def gradient_descent(simulation,
                 if simulation_trial.J < simulation.J - sigma * step * simulation.Dj_norm2:
                     break
 
-                print(f'{i:3}.{j:<2} {step:14.7e} {simulation_trial.J:14.7e}  {13*"-"}')
+                print(f"{simulation_trial.J:15.7e}{13*'-':>15}")
                 j += 1
                 step *= beta
 
-            print(f'{i:3}.{j:<2} {step:14.7e} '
-                  f'{simulation_trial.J:14.7e} {simulation_trial.Dj_norm:14.7e}')
-
-            # adjust the step size for the next iteration
+            # after a successful iteration adjust the step size for the next iteration
             step *= simulation.Dj_norm2 / simulation_trial.Dj_norm2
             if j==0:
                 step /= beta
 
             simulation = simulation_trial
             descent.append(simulation)
+            print(f"{simulation.J:15.7e}{simulation.Dj_norm:15.7e}")
 
         else:
             print('Maximal number of iterations was reached.')
 
     except KeyboardInterrupt:
-        print('Interrupted by user...')
+        print('\nInterrupted by user...')
     except DescendLoopException:
-        print('The descend procedure has looped since control reached '
+        print('\nThe descend procedure has looped since control reached '
               'the boundary of the feasible set:\n'
               'project(control_next) == control_current.')
     except DescendToleranceException:
-        print('The descend procedure was interrupted since\n'
+        print('\nThe descend procedure was interrupted since\n'
               'step * simulation.Dj_norm < tolerance.')
 
     print('Terminating.')
