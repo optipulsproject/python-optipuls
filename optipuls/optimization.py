@@ -66,11 +66,16 @@ def gradient_descent(simulation,
                 j += 1
                 step *= beta
 
-            simulation = simulation_trial
             print(f'{i:3}.{j:<2} {step:14.7e} '
-                  f'{simulation.J:14.7e} {simulation.Dj_norm:14.7e}')
+                  f'{simulation_trial.J:14.7e} {simulation_trial.Dj_norm:14.7e}')
+
+            # adjust the step size for the next iteration
+            step *= simulation.Dj_norm2 / simulation_trial.Dj_norm2
+            if j==0:
+                step /= beta
+
+            simulation = simulation_trial
             descent.append(simulation)
-            step /= beta
 
         else:
             print('Maximal number of iterations was reached.')
