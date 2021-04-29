@@ -1,4 +1,5 @@
 from .core import integral2
+from numpy import sqrt
 
 
 class Simulation():
@@ -61,8 +62,16 @@ class Simulation():
         try:
             return self._Dj_norm
         except AttributeError:
-            self._Dj_norm = self.problem.norm(self.Dj)
+            self._Dj_norm = sqrt(self.Dj_norm2)
             return self._Dj_norm
+
+    @property
+    def Dj_norm2(self):
+        try:
+            return self._Dj_norm2
+        except AttributeError:
+            self._Dj_norm2 = self.problem.norm2(self.Dj)
+            return self._Dj_norm2
 
     @property
     def penalty_velocity_vector(self):
