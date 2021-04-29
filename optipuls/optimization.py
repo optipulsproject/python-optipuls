@@ -14,6 +14,7 @@ def gradient_descent(simulation,
                      iter_max=50,
                      step_init=1,
                      tolerance=10**-9,
+                     sigma=10**-2,
                      beta=.5):
     '''Runs the gradient descent procedure.
 
@@ -57,7 +58,9 @@ def gradient_descent(simulation,
 
                 simulation_trial = simulation.spawn(control_trial)
 
-                if simulation_trial.J < simulation.J: break
+                # check if Armijo condition is satisfied, reduce the step otherwise
+                if simulation_trial.J < simulation.J - sigma * step * simulation.Dj_norm2:
+                    break
 
                 print(f'{i:3}.{j:<2} {step:14.7e} {simulation_trial.J:14.7e}  {13*"-"}')
                 j += 1
