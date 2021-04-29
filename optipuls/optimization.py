@@ -6,6 +6,8 @@ from .simulation import Simulation
 class DescendLoopException(Exception):
     pass
 
+class DescendToleranceException(Exception):
+    pass
 
 def gradient_descent(simulation, iter_max=50, step_init=1, tolerance=10**-9):
     '''Runs the gradient descent procedure.
@@ -38,12 +40,10 @@ def gradient_descent(simulation, iter_max=50, step_init=1, tolerance=10**-9):
         print(f'{simulation.J:36.7e} {simulation.Dj_norm:14.7e}')
 
         for i in range(iter_max):
-            if simulation.Dj_norm < tolerance:
-                print(f'norm(Dj) = {simulation.Dj_norm:.7e} < tolerance')
-                break
-
             j = 0
             while True:
+                if step * simulation.Dj_norm < tolerance:
+                    raise DescendToleranceException
                 control_trial = (
                     simulation.control - step * simulation.Dj).clip(0, 1)
                 if np.allclose(control_trial, simulation.control):
@@ -71,6 +71,9 @@ def gradient_descent(simulation, iter_max=50, step_init=1, tolerance=10**-9):
         print('The descend procedure has looped since control reached '
               'the boundary of the feasible set:\n'
               'project(control_next) == control_current.')
+    except DescendToleranceException:
+        print('The descend procedure was interrupted since\n'
+              'step * simulation.Dj_norm < tolerance.')
 
     print('Terminating.')
 
