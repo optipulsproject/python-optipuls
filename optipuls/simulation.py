@@ -70,7 +70,7 @@ class Simulation():
             return self._penalty_velocity_vector
         except AttributeError:
             self._penalty_velocity_vector = \
-                self.problem.dt * self.problem.beta_velocity * \
+                self.problem.time_domain.dt * self.problem.beta_velocity * \
                 self.problem.vectorize_penalty_term(
                     self.evo,
                     lambda k, theta_k, theta_kp1: integral2(
@@ -92,7 +92,7 @@ class Simulation():
             return self._penalty_liquidity_vector
         except AttributeError:
             self._penalty_liquidity_vector = \
-                self.problem.dt * self.problem.beta_liquidity * \
+                self.problem.time_domain.dt * self.problem.beta_liquidity * \
                 self.problem.vectorize_penalty_term(
                     self.evo,
                     lambda k, theta_k, theta_kp1: integral2(
@@ -146,7 +146,7 @@ class Simulation():
     def energy_total(self):
         '''Total used energy [J].'''
         P_YAG = self.problem.P_YAG
-        dt = self.problem.dt
+        dt = self.problem.time_domain.dt
         control = self.control
 
         return P_YAG * dt * sum(control)
