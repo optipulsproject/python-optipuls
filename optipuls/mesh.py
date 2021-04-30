@@ -3,25 +3,25 @@ from dolfin import DOLFIN_EPS
 
 
 # Space dimensions
-R = 0.0015
+R = 0.0025
 R_laser = 0.0002
 Z = 0.0005
 
 class Domain_2(dolfin.SubDomain):
     def inside(self, x, on_boundary):
-        return x[0] < 0.4 * R
+        return x[0] < 0.6 * R
 
 class Domain_3(dolfin.SubDomain):
     def inside(self, x, on_boundary):
-        return x[0] < 0.2 * R
+        return x[0] < 0.4 * R
 
 class Domain_4(dolfin.SubDomain):
     def inside(self, x, on_boundary):
-        return x[0] < 0.1 * R
+        return x[0] < 0.2 * R
 
 class Domain_5(dolfin.SubDomain):
     def inside(self, x, on_boundary):
-        return x[0] < 0.05 * R and x[1] > 0.5 * Z
+        return x[0] < 0.2 * R and x[1] > 0.5 * Z
 
 class LaserBoundary(dolfin.SubDomain):
     def inside(self, x, on_boundary):
@@ -34,7 +34,7 @@ class EmptyBoundary(dolfin.SubDomain):
 
 
 # Create and refine mesh
-mesh = dolfin.RectangleMesh(dolfin.Point(0,0), dolfin.Point(R,Z), 200, 4)
+mesh = dolfin.RectangleMesh(dolfin.Point(0,0), dolfin.Point(R,Z), 25, 5)
 
 domain_2 = Domain_2()
 domain_3 = Domain_3()
