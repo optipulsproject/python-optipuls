@@ -89,8 +89,8 @@ class Problem:
         form = self.time_domain.dt * self.beta_velocity\
              * core.integral2(self.velocity(theta_k, theta_kp1))
 
-        if k == self.time_domain.Nt:
-            form += dt * self.beta_liquidity\
+        if k == self.time_domain.Nt - 1:
+            form += self.time_domain.dt * self.beta_liquidity\
                   * core.integral2(self.liquidity(theta_k, theta_kp1))
 
         return form
