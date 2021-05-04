@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 # from numpy.polynomial import Polynomial
 
-import splines
+import optipuls.splines as splines
 
 
 class SplineTestCase(unittest.TestCase):
