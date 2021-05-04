@@ -46,11 +46,11 @@ def gradient_descent(simulation,
         print(f"{simulation.J:36.7e}{simulation.Dj_norm:15.7e}")
 
         for i in range(1, iter_max + 1):
+            if simulation.PDj_norm < tolerance:
+                raise DescendToleranceException
             j = 0
             while True:
                 print(f"{i:3}.{j:<2}{step:15.7e}", end='', flush=True)
-                if step * simulation.Dj_norm < tolerance:
-                    raise DescendToleranceException
 
                 control_trial = (simulation.control - step * simulation.Dj).clip(0, 1)
 
@@ -87,7 +87,7 @@ def gradient_descent(simulation,
               'project(control_next) == control_current.')
     except DescendToleranceException:
         print('\nThe descend procedure was interrupted since\n'
-              'step * simulation.Dj_norm < tolerance.')
+              'simulation.PDj_norm < tolerance.')
 
     print('Terminating.')
 
