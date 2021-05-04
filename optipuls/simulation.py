@@ -1,6 +1,3 @@
-from .core import integral2
-
-
 class Simulation():
     '''Caches the computation results and keeps related values together.'''
 
@@ -73,7 +70,7 @@ class Simulation():
                 self.problem.time_domain.dt * self.problem.beta_velocity * \
                 self.problem.vectorize_penalty_term(
                     self.evo,
-                    lambda k, theta_k, theta_kp1: integral2(
+                    lambda k, theta_k, theta_kp1: self.problem.integral2(
                             self.problem.velocity(theta_k, theta_kp1)))
             return self._penalty_velocity_vector
 
@@ -95,7 +92,7 @@ class Simulation():
                 self.problem.time_domain.dt * self.problem.beta_liquidity * \
                 self.problem.vectorize_penalty_term(
                     self.evo,
-                    lambda k, theta_k, theta_kp1: integral2(
+                    lambda k, theta_k, theta_kp1: self.problem.integral2(
                             self.problem.liquidity(theta_k, theta_kp1)))
             return self._penalty_liquidity_vector
 

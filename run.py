@@ -7,11 +7,11 @@ import numpy as np
 import optipuls.visualization as vis
 from optipuls.simulation import Simulation
 from optipuls.problem import Problem
-from optipuls.mesh import mesh, R, R_laser, Z
 import optipuls.coefficients as coefficients
 import optipuls.material as material
 import optipuls.optimization as optimization
 from optipuls.time import TimeDomain
+from optipuls.space import SpaceDomain
 
 
 # parse command line arguments
@@ -26,17 +26,18 @@ dolfin.set_log_level(40)
 dolfin.parameters["form_compiler"]["quadrature_degree"] = 1
 
 
-
-P_YAG = 2000.
-absorb = 0.135
-R_laser = 0.0002
-laser_pd = (absorb * P_YAG) / (np.pi * R_laser**2)
-
 # set up the problem
 problem = Problem()
 
-time_domain = TimeDomain(0.015, 30)
+time_domain = TimeDomain(0.020, 200)
 problem.time_domain = time_domain
+
+space_domain = SpaceDomain(0.0025, 0.0002, 0.0005)
+problem.space_domain = space_domain
+
+P_YAG = 1500.
+absorb = 0.135
+laser_pd = (absorb * P_YAG) / (np.pi * space_domain.R_laser**2)
 
 problem.P_YAG = P_YAG
 problem.laser_pd = laser_pd
@@ -56,12 +57,12 @@ problem.velocity_max = 0.15
 problem.beta_liquidity = 10**12
 problem.beta_welding = 10**-2
 problem.threshold_temp = 1000.
-problem.target_point = dolfin.Point(0, .7*Z)
+problem.target_point = dolfin.Point(0, .7 * space_domain.Z)
 problem.pow_ = 20
 
 # initialize FEM spaces
-problem.V = dolfin.FunctionSpace(mesh, "CG", 1)
-problem.V1 = dolfin.FunctionSpace(mesh, "DG", 0)
+problem.V = dolfin.FunctionSpace(space_domain.mesh, "CG", 1)
+problem.V1 = dolfin.FunctionSpace(space_domain.mesh, "DG", 0)
 
 problem.theta_init = dolfin.project(problem.temp_amb, problem.V)
 
