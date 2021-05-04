@@ -83,6 +83,22 @@ class Simulation():
             return self._PDj
 
     @property
+    def PDj_norm(self):
+        try:
+            return self._PDj_norm
+        except AttributeError:
+            self._PDj_norm = sqrt(self.PDj_norm2)
+            return self._PDj_norm
+
+    @property
+    def PDj_norm2(self):
+        try:
+            return self._PDj_norm2
+        except AttributeError:
+            self._PDj_norm2 = self.problem.norm2(self.PDj)
+            return self._PDj_norm2
+
+    @property
     def penalty_velocity_vector(self):
         try:
             return self._penalty_velocity_vector
