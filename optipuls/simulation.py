@@ -1,5 +1,6 @@
 from .core import integral2
 from numpy import sqrt
+import numpy as np
 
 
 class Simulation():
@@ -72,6 +73,14 @@ class Simulation():
         except AttributeError:
             self._Dj_norm2 = self.problem.norm2(self.Dj)
             return self._Dj_norm2
+
+    @property
+    def PDj(self):
+        try:
+            return self._PDj
+        except AttributeError:
+            self._PDj = project_Dj(self.Dj, self.control)
+            return self._PDj
 
     @property
     def penalty_velocity_vector(self):
@@ -197,3 +206,14 @@ temp_target_point_max:      {self.temp_target_point_vector.max():9.6} [K]
     def spawn(self, control):
         '''Spawns a new simulation instance based for the same problem.'''
         return Simulation(self.problem, control)
+
+
+def project_Dj(Dj, control):
+    positive = lambda A: np.maximum(A, 0)
+    negative = lambda A: np.minimum(A, 0)
+    filter_positive = lambda A: np.where(control < 1, A, positive(A))
+    filter_negative = lambda A: np.where(control > 0, A, negative(A))
+
+    PDj = filter_negative(filter_positive(Dj))
+
+    return PDj
