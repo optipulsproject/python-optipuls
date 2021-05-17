@@ -42,8 +42,8 @@ def gradient_descent(simulation,
         step = step_init
         problem = simulation.problem
 
-        print(f"{'i':>3}.{'j':<2}{'step':>15}{'J':>15}{'norm(Dj)':>15}")
-        print(f"{simulation.J:36.7e}{simulation.Dj_norm:15.7e}")
+        print(f"{'i':>3}.{'j':<2}{'step':>15}{'J':>15}{'norm(Dj)':>15}{'norm(PDj)':>15}")
+        print(f"{simulation.J:36.7e}{simulation.Dj_norm:15.7e}{simulation.PDj_norm:15.7e}")
 
         for i in range(1, iter_max + 1):
             if simulation.PDj_norm < tolerance:
@@ -63,7 +63,7 @@ def gradient_descent(simulation,
                 if simulation_trial.J < simulation.J - sigma * step * simulation.Dj_norm2:
                     break
 
-                print(f"{simulation_trial.J:15.7e}{13*'-':>15}")
+                print(f"{simulation_trial.J:15.7e}{13*'-':>15}{13*'-':>15}")
                 j += 1
                 step *= beta
 
@@ -74,7 +74,7 @@ def gradient_descent(simulation,
 
             simulation = simulation_trial
             descent.append(simulation)
-            print(f"{simulation.J:15.7e}{simulation.Dj_norm:15.7e}")
+            print(f"{simulation.J:15.7e}{simulation.Dj_norm:15.7e}{simulation.PDj_norm:15.7e}")
 
         else:
             print('Maximal number of iterations was reached.')
