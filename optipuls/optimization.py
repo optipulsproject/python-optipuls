@@ -68,7 +68,7 @@ def gradient_descent(simulation,
                 step *= beta
 
             # after a successful iteration adjust the step size for the next iteration
-            step *= simulation.Dj_norm2 / simulation_trial.Dj_norm2
+            step *= simulation.PDj_norm2 / simulation_trial.PDj_norm2
             if j==0:
                 step /= beta
 
