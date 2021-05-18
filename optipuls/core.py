@@ -399,3 +399,14 @@ def compute_ps_magnitude(
     magnitude *= - magnitude_common
 
     return magnitude
+
+
+def project_Dj(Dj, control):
+    positive = lambda A: np.maximum(A, 0)
+    negative = lambda A: np.minimum(A, 0)
+    filter_positive = lambda A: np.where(control < 1, A, positive(A))
+    filter_negative = lambda A: np.where(control > 0, A, negative(A))
+
+    PDj = filter_negative(filter_positive(Dj))
+
+    return PDj

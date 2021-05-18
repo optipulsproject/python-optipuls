@@ -1,6 +1,6 @@
 from .core import integral2
+from .core import project_Dj
 from numpy import sqrt
-import numpy as np
 
 
 class Simulation():
@@ -222,14 +222,3 @@ temp_target_point_max:      {self.temp_target_point_vector.max():9.6} [K]
     def spawn(self, control):
         '''Spawns a new simulation instance based for the same problem.'''
         return Simulation(self.problem, control)
-
-
-def project_Dj(Dj, control):
-    positive = lambda A: np.maximum(A, 0)
-    negative = lambda A: np.minimum(A, 0)
-    filter_positive = lambda A: np.where(control < 1, A, positive(A))
-    filter_negative = lambda A: np.where(control > 0, A, negative(A))
-
-    PDj = filter_negative(filter_positive(Dj))
-
-    return PDj
