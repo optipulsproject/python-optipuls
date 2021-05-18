@@ -15,7 +15,8 @@ def gradient_descent(simulation,
                      step_init=1,
                      tolerance=10**-9,
                      sigma=10**-2,
-                     beta=.5):
+                     beta=.5,
+                     step_prediction=False):
     '''Runs the gradient descent procedure.
 
     Parameters:
@@ -68,7 +69,8 @@ def gradient_descent(simulation,
                 step *= beta
 
             # after a successful iteration adjust the step size for the next iteration
-            step *= simulation.PDj_norm2 / simulation_trial.PDj_norm2
+            if step_prediction:
+                step *= simulation.PDj_norm2 / simulation_trial.PDj_norm2
             if j==0:
                 step /= beta
 
