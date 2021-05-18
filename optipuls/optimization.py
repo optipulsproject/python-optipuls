@@ -29,11 +29,18 @@ def gradient_descent(simulation,
         tolerance: float
             The gradient descent procedure stops when the gradient norm becomes
             less than tolerance.
+        sigma: float
+            A small positive constant used in the Armijo condition.
+        beta: float, 0 < beta < 1
+            Multiplier for the line search.
+        step_prediction: bool
+            Whether the step prediction formula will be used.
 
     Returns:
         descent: [Simulation]
             List of simulations, corresponding to succesful steps of gradient
             descent, starting with the provided initial guess.
+
 
     '''
 
