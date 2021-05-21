@@ -25,7 +25,8 @@ class Problem:
         return core.a(
                 u_k, u_kp1, v, control_k,
                 self.vhc, self.kappa, self.cooling_bc, self.laser_bc,
-                self.time_domain.dt, self.implicitness)
+                self.time_domain.dt, self.implicitness,
+                self.space_domain.x, self.space_domain.ds)
 
     def laser_bc(self, control_k):
         return core.laser_bc(control_k, self.laser_pd)
@@ -42,7 +43,9 @@ class Problem:
                 self.control_ref,
                 self.beta_control,
                 self.beta_welding,
-                self.laser_pd)
+                self.laser_pd,
+                self.space_domain.x,
+                self.space_domain.ds)
 
     def compute_evo_vel(self, evo, velocity_max):
         return core.compute_evo_vel(
@@ -87,11 +90,11 @@ class Problem:
 
     def j(self, k, theta_k, theta_kp1):
         form = self.time_domain.dt * self.beta_velocity\
-             * core.integral2(self.velocity(theta_k, theta_kp1))
+             * self.integral2(self.velocity(theta_k, theta_kp1))
 
         if k == self.time_domain.Nt - 1:
             form += self.time_domain.dt * self.beta_liquidity\
-                  * core.integral2(self.liquidity(theta_k, theta_kp1))
+                  * self.integral2(self.liquidity(theta_k, theta_kp1))
 
         return form
 
@@ -121,3 +124,7 @@ class Problem:
                 evo,
                 V=self.V,
                 point=point)
+
+    def integral2(self, form):
+        x = self.space_domain.x
+        return core.integral2(form, x)

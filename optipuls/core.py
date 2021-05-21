@@ -5,8 +5,6 @@ from ufl import inner, grad, conditional, ge, gt, lt, le, And
 import numpy as np
 from matplotlib import pyplot as plt
 
-from .mesh import x, ds
-
 
 def laser_bc(control_k, laser_pd):
     return laser_pd * Constant(control_k)
@@ -26,7 +24,7 @@ def norm(dt, vector):
     '''Calculates L2[0,T] norm.'''
     return np.sqrt(norm2(dt, vector))
 
-def integral2(form):
+def integral2(form, x):
     return form**2 * x[0] * dx
 
 def avg(u_k, u_kp1, implicitness):
@@ -34,7 +32,7 @@ def avg(u_k, u_kp1, implicitness):
 
 
 def a(u_k, u_kp1, v, control_k,
-      vhc, kappa, cooling_bc, laser_bc, dt, implicitness):
+      vhc, kappa, cooling_bc, laser_bc, dt, implicitness, x, ds):
     u_avg = avg(u_k, u_kp1, implicitness)
 
     a_ = vhc(u_k) * (u_kp1 - u_k) * v * x[0] * dx\
@@ -181,7 +179,8 @@ def solve_adjoint(evo, control, ps_magnitude, target_point, a, V, j):
     return evo_adj
 
 
-def Dj(evo_adj, control, V, control_ref, beta_control, beta_welding, laser_pd):
+def Dj(evo_adj, control, V, control_ref, beta_control, beta_welding, laser_pd,
+       x, ds):
     '''Calculates the gradient of the cost functional for the given control.
 
 
