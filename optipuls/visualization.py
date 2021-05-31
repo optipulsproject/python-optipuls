@@ -225,3 +225,30 @@ def debug_plot(simulation, outfile=None, **kwargs):
         plt.show(**kwargs)
     else:
         plt.savefig(outfile, **kwargs)
+
+
+def plot_control(control,
+                 title=None,
+                 label=None,
+                 outfile=None,
+                 color='blue',
+                 size_inches=(12, 8),
+                 **kwargs):
+
+    fig, ax = plt.subplots()
+    fig.set_size_inches(*size_inches)
+    ax.set_ylim(0, 1)
+    ax.set_title(title)
+
+    x = np.arange(len(control))
+
+    ax.scatter(x, control, color=color, zorder=0)
+    ax.plot(x, control, color=color, zorder=1, label=label)
+
+    ax.legend(loc=2)
+
+    plt.tight_layout()
+    if not outfile:
+        plt.show(**kwargs)
+    else:
+        plt.savefig(outfile, **kwargs)
