@@ -50,7 +50,6 @@ problem.liquidus = 923.0
 problem.solidus = 858.0
 
 # optimization parameters
-problem.control_ref = np.zeros(time_domain.Nt)
 problem.beta_control = 10**2
 problem.beta_velocity = 10**18
 problem.velocity_max = 0.15

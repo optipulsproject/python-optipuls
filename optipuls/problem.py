@@ -1,4 +1,5 @@
 from . import core
+import numpy as np
 
 class Problem:
     def __init__(self):
@@ -128,3 +129,18 @@ class Problem:
     def integral2(self, form):
         x = self.space_domain.x
         return core.integral2(form, x)
+
+    @property
+    def control_ref(self):
+        '''Initialize control_ref with zeros automatically.
+
+        Since a non trivial control_ref might be used only for debugging
+        purposes, there is no user-level setter for it. Wisely use _control_ref
+        to assign a non-trivial value.
+
+        '''
+        try:
+            return self._control_ref
+        except AttributeError:
+            self._control_ref = np.zeros(self.time_domain.Nt)
+            return self._control_ref
