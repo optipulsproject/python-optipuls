@@ -1,5 +1,11 @@
-from . import core
+import dolfin
 import numpy as np
+
+from . import core
+from .uflspline import UFLSpline
+
+class IncompleteProblemException(Exception):
+    pass
 
 class Problem:
     def __init__(self):
@@ -144,3 +150,36 @@ class Problem:
         except AttributeError:
             self._control_ref = np.zeros(self.time_domain.Nt)
             return self._control_ref
+
+    @property
+    def vhc(self):
+        try:
+            return self._vhc
+        except AttributeError:
+            raise IncompleteProblemException(
+                'vhc spline must be assigned to complete problem formulation')
+
+    @vhc.setter
+    def vhc(self, spline):
+        self._vhc = UFLSpline(spline, self.V.ufl_element())
+
+
+    @property
+    def kappa(self):
+        try:
+            return lambda theta: dolfin.as_matrix(
+                    [[self._kappa_rad(theta), dolfin.Constant(0)],
+                     [dolfin.Constant(0), self._kappa_ax(theta)]])
+        except AttributeError:
+            raise IncompleteProblemException(
+                'kappa spline must be assigned to complete problem formulation')
+
+    @kappa.setter
+    def kappa(self, splines):
+        try:
+            spline_rad, spline_ax = splines
+        except:
+            raise ValueError('Two splines must be provided to construct kappa')
+
+        self._kappa_rad = UFLSpline(spline_rad, self.V.ufl_element())
+        self._kappa_ax = UFLSpline(spline_ax, self.V.ufl_element())

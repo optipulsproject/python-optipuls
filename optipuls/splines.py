@@ -22,9 +22,6 @@ import numbers
 
 import numpy as np
 from numpy.polynomial import Polynomial
-from ufl import ge, gt, lt, le, And
-import ufl
-import dolfin
 
 
 # Hermite basis polynomials
@@ -65,17 +62,12 @@ class Spline:
         self.coef_array = coef_array
 
     def __call__(self, x):
-        if isinstance(x, numbers.Number):
-            for (knot, coef) in zip(self.knots, self.coef_array):
-                if x < knot:
-                    return Polynomial(coef)(x)
-            else:
-                coef = self.coef_array[-1]
+        for (knot, coef) in zip(self.knots, self.coef_array):
+            if x < knot:
                 return Polynomial(coef)(x)
-        elif isinstance(x, dolfin.function.function.Function):
-            ufl_form = self.ufl_form
-            t = self._ufl_coef
-            return ufl.replace(ufl_form, {t: x})
+        else:
+            coef = self.coef_array[-1]
+            return Polynomial(coef)(x)
 
     def derivative(self):
         knots = self.knots
@@ -87,38 +79,6 @@ class Spline:
     def dump(self, file='spline.npz'):
         '''Dumps into a file.'''
         np.savez(file, knots=self.knots, coef_array=self.coef_array)
-
-    @property
-    def ufl_form(self):
-        try:
-            return self._ufl_form
-        except AttributeError:
-            self._ufl_form = self.gen_ufl_form()
-            return self._ufl_form
-
-    def gen_ufl_form(self):
-        element = self.problem.V.ufl_element()
-        self._ufl_coef = ufl.Coefficient(element)
-
-        t = self._ufl_coef
-        knots = self.knots
-        coef_array = self.coef_array
-
-        # assigning left polynomial
-        form = ufl.conditional(lt(t, knots[0]), 1., 0.)\
-                   * Polynomial(coef_array[0])(t)
-
-        # assigning internal polynomials
-        for knot, knot_, coef in\
-                zip(knots[:-1], knots[1:], coef_array[1:-1]):
-            form += ufl.conditional(And(ge(t, knot), lt(t, knot_)), 1., 0.)\
-                        * Polynomial(coef)(t)
-
-        # assigning right polynomial
-        form += ufl.conditional(ge(t, knots[-1]), 1., 0.)\
-                    * Polynomial(coef_array[-1])(t)
-
-        return form
 
 
 class HermiteSpline(Spline):

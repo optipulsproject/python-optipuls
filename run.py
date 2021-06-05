@@ -73,17 +73,8 @@ vhc = coefficients.construct_vhc_spline(dummy_material)
 kappa_rad = coefficients.construct_kappa_spline(dummy_material, 'rad')
 kappa_ax = coefficients.construct_kappa_spline(dummy_material, 'ax')
 
-# leth the spline object know about the functional space
-# in order to generate a UFL-form
-# a dull solution until we have a better one
-vhc.problem = problem
-kappa_rad.problem = problem
-kappa_ax.problem = problem
-
 problem.vhc = vhc
-problem.kappa = lambda theta: as_matrix(
-                    [[kappa_rad(theta), Constant(0)],
-                     [Constant(0), kappa_ax(theta)]])
+problem.kappa = (kappa_rad, kappa_ax)
 
 print('Creating a test simulation.')
 test_control = 0.5 + 0.1 * np.sin(0.5 * time_domain.timeline / np.pi)
