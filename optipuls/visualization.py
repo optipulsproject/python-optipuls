@@ -195,5 +195,60 @@ def temperature_plot(timeline, *temperatures, labels=None, outfile=None,
         plt.savefig(outfile, **kwargs)
 
 
+def debug_plot(simulation, outfile=None, **kwargs):
+    fig, ax = plt.subplots()
+    fig.set_size_inches(*size_inches)
+
+    ax.set_title('control, Dj, and PDj')
+    ax.set_ylim(0, 1)
+    ax.set_ylabel('control')
+
+    x = np.arange(simulation.problem.time_domain.Nt)
+
+    ax.scatter(x, simulation.control, color='blue', zorder=0, label='control')
+    ax.plot(x, simulation.control, color='blue', zorder=1)
+
+    ax2 = ax.twinx()
+    ax2.set_ylabel('gradient')
+
+    ax2.scatter(x, -simulation.Dj, color='red', zorder=0, label='Dj')
+    ax2.plot(x, -simulation.Dj, color='red', zorder=1)
+
+    ax2.scatter(x, -simulation.PDj, color='orange', zorder=0, label='PDj')
+    ax2.plot(x, -simulation.PDj, color='orange', zorder=1)
+
+    ax2.scatter(x, simulation.penalty_velocity_vector, color='green', zorder=0)
+    ax2.plot(x, simulation.penalty_velocity_vector, color='green', zorder=1)
+
+    plt.tight_layout()
+    if not outfile:
+        plt.show(**kwargs)
+    else:
+        plt.savefig(outfile, **kwargs)
 
 
+def plot_control(control,
+                 title=None,
+                 label=None,
+                 outfile=None,
+                 color='blue',
+                 size_inches=(12, 8),
+                 **kwargs):
+
+    fig, ax = plt.subplots()
+    fig.set_size_inches(*size_inches)
+    ax.set_ylim(0, 1)
+    ax.set_title(title)
+
+    x = np.arange(len(control))
+
+    ax.scatter(x, control, color=color, zorder=0)
+    ax.plot(x, control, color=color, zorder=1, label=label)
+
+    ax.legend(loc=2)
+
+    plt.tight_layout()
+    if not outfile:
+        plt.show(**kwargs)
+    else:
+        plt.savefig(outfile, **kwargs)
