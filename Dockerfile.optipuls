@@ -1,3 +1,5 @@
 FROM quay.io/fenicsproject/stable:latest
 RUN python3 -m pip install git+https://github.com/dstrelnikov/optipuls
+WORKDIR /home/fenics/shared
 CMD ["/bin/bash"]
+ENTRYPOINT []
