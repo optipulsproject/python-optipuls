@@ -69,7 +69,7 @@ problem.theta_init = dolfin.project(problem.temp_amb, problem.V)
 # read the material properties and initialize equation coefficients
 dummy_material = material.from_file('materials/dummy.json')
 
-vhc = coefficients.construct_vhc_spline(dummy_material)
+vhc, _ = coefficients.construct_vhc_spline(dummy_material)
 kappa_rad = coefficients.construct_kappa_spline(dummy_material, 'rad')
 kappa_ax = coefficients.construct_kappa_spline(dummy_material, 'ax')
 

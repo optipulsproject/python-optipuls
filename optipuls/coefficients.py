@@ -86,7 +86,7 @@ def construct_vhc_spline(material):
                 [b_liquid, k_liquid, 0, 0]
             ])
 
-    return vhc_spline
+    return vhc_spline, polynomial_mid
 
 
 def construct_kappa_spline(material, direction):
