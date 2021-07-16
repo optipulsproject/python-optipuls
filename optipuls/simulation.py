@@ -221,3 +221,21 @@ temp_target_point_max:      {self.temp_target_point_vector.max():9.6} [K]
     def spawn(self, control):
         '''Spawns a new simulation instance based for the same problem.'''
         return Simulation(self.problem, control)
+
+    @property
+    def welding_depth_vector(self):
+        try:
+            return self._welding_depth_vector
+        except AttributeError:
+            self._welding_depth_vector = \
+                self.problem.compute_welding_depth(self.evo)
+            return self._welding_depth_vector
+
+    @property
+    def welding_radius_vector(self):
+        try:
+            return self._welding_radius_vector
+        except AttributeError:
+            self._welding_radius_vector = \
+                self.problem.compute_welding_radius(self.evo)
+            return self._welding_radius_vector

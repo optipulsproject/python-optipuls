@@ -183,3 +183,21 @@ class Problem:
 
         self._kappa_rad = UFLSpline(spline_rad, self.V.ufl_element())
         self._kappa_ax = UFLSpline(spline_ax, self.V.ufl_element())
+
+    def compute_welding_depth(self, evo):
+        return core.compute_welding_size(
+                    evo,
+                    self.V,
+                    self.liquidus,
+                    self.space_domain.x,
+                    self.space_domain.ds(0),
+        )
+
+    def compute_welding_radius(self, evo):
+        return core.compute_welding_size(
+                    evo,
+                    self.V,
+                    self.liquidus,
+                    self.space_domain.x,
+                    self.space_domain.ds(1) + self.space_domain.ds(2),
+        )

@@ -85,7 +85,17 @@ class SpaceDomain:
             right_side=0,
             )
 
+        # whole top boundary with no separation
+        top_boundary = dolfin.CompiledSubDomain(
+            'near(x[1], top_side) && on_boundary',
+            top_side=Z)
+
+        symmetry_ax_boundary = dolfin.CompiledSubDomain(
+            'near(x[0], right_side) && on_boundary',
+            right_side=0)
+
         boundary_markers = dolfin.MeshFunction('size_t', mesh, mesh.topology().dim()-1)
+
         symmetry_ax_boundary.mark(boundary_markers, 0)
         top_laser_boundary.mark(boundary_markers, 1)
         top_nonlaser_boundary.mark(boundary_markers, 2)

@@ -409,3 +409,39 @@ def project_Dj(Dj, control):
     PDj = filter_negative(filter_positive(Dj))
 
     return PDj
+
+def compute_welding_size(evo, V, threshold_temp, x, ds):
+    '''Computes either the welding depth or the welding radius.
+
+    Parameters:
+        evo: ndarray
+            The coefficients of the solution to the corresponding forward
+            problem in the basis of the space V (see solve_forward).
+        V: dolfin.FunctionSpace
+            The FEM space of the problem being solved.
+        threshold_temp: float
+            The threshold temperature used as a criterion for successful welding.
+        ds: dolfin.Measure
+            The measure on either the symmetry axis (for welding depth) or
+            the top boundary (for welding radius).
+
+    Returns:
+        evo_size: ndarray
+            Contains size of either the welding depth or the welding radius over
+            all time steps.
+
+    '''
+
+    theta_k = dolfin.Function(V)
+
+    Nt = len(evo) - 1
+    evo_size = np.zeros(Nt+1)
+
+    for k in range(Nt+1):
+        theta_k.vector().set_local(evo[k])
+
+        evo_size[k] =  dolfin.assemble(
+                conditional(ge(theta_k, threshold_temp), 1., 0.) * ds
+        )
+
+    return evo_size
