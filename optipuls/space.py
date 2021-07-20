@@ -63,17 +63,45 @@ class SpaceDomain:
         R_laser = self.R_laser
         Z = self.Z
 
-        laser_boundary = dolfin.CompiledSubDomain(
-            "near(x[1], top_side) && x[0] < R_laser && on_boundary",
-            top_side=Z, R_laser=R_laser)
+        top_laser_boundary = dolfin.CompiledSubDomain(
+            'near(x[1], top_side) && x[0] < R_laser && on_boundary',
+            top_side=Z,
+            R_laser=R_laser,
+            )
 
-        empty_boundary = dolfin.CompiledSubDomain(
-            '((near(x[1], top_side) && x[0]>= R_laser) || near(x[1], bottom_side)) && on_boundary',
-            top_side=Z, bottom_side=0, R_laser=R_laser)
+        top_nonlaser_boundary = dolfin.CompiledSubDomain(
+            'near(x[1], top_side) && x[0]>= R_laser && on_boundary',
+            top_side=Z,
+            R_laser=R_laser,
+            )
+
+        bottom_boundary = dolfin.CompiledSubDomain(
+            'near(x[1], bottom_side) && on_boundary',
+            bottom_side=0,
+            )
+
+        symmetry_ax_boundary = dolfin.CompiledSubDomain(
+            'near(x[0], right_side) && on_boundary',
+            right_side=0,
+            )
+
+        # whole top boundary with no separation
+        top_boundary = dolfin.CompiledSubDomain(
+            'near(x[1], top_side) && on_boundary',
+            top_side=Z)
+
+        symmetry_ax_boundary = dolfin.CompiledSubDomain(
+            'near(x[0], right_side) && on_boundary',
+            right_side=0)
 
         boundary_markers = dolfin.MeshFunction('size_t', mesh, mesh.topology().dim()-1)
-        laser_boundary.mark(boundary_markers, 1)
-        empty_boundary.mark(boundary_markers, 2)
+
+        symmetry_ax_boundary.mark(boundary_markers, 0)
+        top_laser_boundary.mark(boundary_markers, 1)
+        top_nonlaser_boundary.mark(boundary_markers, 2)
+        # side_boun.mark(boundary_markers, 3)
+        bottom_boundary.mark(boundary_markers, 4)
+
         ds = dolfin.Measure('ds', domain=mesh, subdomain_data=boundary_markers)
 
         return ds

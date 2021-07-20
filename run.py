@@ -76,15 +76,15 @@ kappa_ax = coefficients.construct_kappa_spline(dummy_material, 'ax')
 problem.vhc = vhc
 problem.kappa = (kappa_rad, kappa_ax)
 
-print('Creating a test simulation.')
-test_control = 0.5 + 0.1 * np.sin(0.5 * time_domain.timeline / np.pi)
-test_simulation = Simulation(problem, test_control)
+# print('Creating a test simulation.')
+# test_control = 0.5 + 0.1 * np.sin(0.5 * time_domain.timeline / np.pi)
+# test_simulation = Simulation(problem, test_control)
 
-epsilons, deltas_fwd = optimization.gradient_test(
-        test_simulation, eps_init=10**-5, iter_max=15)
-vis.gradient_test_plot(
-        epsilons, deltas_fwd, outfile=args.scratch+'/gradient_test.png')
-print(f'Gradient test complete. See {args.scratch}/gradient_test.png')
+# epsilons, deltas_fwd = optimization.gradient_test(
+#         test_simulation, eps_init=10**-5, iter_max=15)
+# vis.gradient_test_plot(
+#         epsilons, deltas_fwd, outfile=args.scratch+'/gradient_test.png')
+# print(f'Gradient test complete. See {args.scratch}/gradient_test.png')
 
 print('Creating an initial simulation.')
 control = np.zeros(time_domain.Nt)
@@ -98,3 +98,7 @@ vis.control_plot(
         labels=['Optimal Control'],
         outfile=args.scratch+'/optimal_control.png')
 print(f'Gradient descent complete. See {args.scratch}/optimal_control.png')
+
+# from optipuls.utils.laser import linear_rampdown
+# control = linear_rampdown(time_domain.timeline, 0.005, 0.010)
+# simulation = Simulation(problem, control)
