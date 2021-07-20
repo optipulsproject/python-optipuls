@@ -38,7 +38,7 @@ def a(u_k, u_kp1, v, control_k,
     a_ = vhc(u_k) * (u_kp1 - u_k) * v * x[0] * dx\
        + dt * inner(kappa(u_k) * grad(u_avg), grad(v)) * x[0] * dx\
        - dt * laser_bc(control_k) * v * x[0] * ds(1)\
-       - dt * cooling_bc(u_avg) * v * x[0] * (ds(1) + ds(2))
+       - dt * cooling_bc(u_avg) * v * x[0] * (ds(1) + ds(2) + ds(4))
 
     return a_
 
