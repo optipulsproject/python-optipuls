@@ -1,6 +1,6 @@
 {
-    "label": "dummy",
-    "description": "A dummy material for testing purposes.",
+    "label": "EN AW-6082 T6",
+    "description": "Experimentally measured properties of EN AW-6082 T6",
     "solidus": 858,
     "liquidus": 923,
     "melting_enthalpy": 397000,
