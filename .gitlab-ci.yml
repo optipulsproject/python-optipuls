@@ -1,9 +1,15 @@
 docker build:
   image: docker:stable
   script:
-    - docker build . -f Dockerfile.optipuls -t optipuls:$CI_COMMIT_REF_SLUG -t optipuls:latest
+    - docker build . -f docker/Dockerfile.optipuls -t optipulsproject/optipuls:$CI_COMMIT_REF_SLUG -t optipulsproject/optipuls:latest
   only:
     refs:
       - develop
-    changes:
-      - Dockerfile.optipuls
+
+docker push:
+  image: docker:stable
+  script:
+    - docker build . -f docker/Dockerfile.optipuls -t optipulsproject/optipuls:$CI_COMMIT_REF_SLUG -t optipulsproject/optipuls:latest
+  only:
+    refs:
+      - develop
