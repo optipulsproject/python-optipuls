@@ -1,3 +1,6 @@
+before_script:
+  - echo -n $CI_REGISTRY_TOKEN | docker login -u "$CI_REGISTRY_USER" --password-stdin
+
 docker build:
   image: docker:stable
   script:
@@ -9,7 +12,8 @@ docker build:
 docker push:
   image: docker:stable
   script:
-    - docker build . -f docker/Dockerfile.optipuls -t optipulsproject/optipuls:$CI_COMMIT_REF_SLUG -t optipulsproject/optipuls:latest
+    - docker push optipulsproject/optipuls:$CI_COMMIT_REF_SLUG
+    - docker push optipulsproject/optipuls:latest
   only:
     refs:
       - develop
