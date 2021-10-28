@@ -11,7 +11,6 @@ This repository contains a numerical model for simulation and optimization of th
 
 ---
 
-
 ![OptiPuls-preview](assets/3d_resized.png)
 
 
@@ -63,9 +62,9 @@ git show -s --tags=experiments --decorate --abbrev-commit --pretty=medium
 ```
 
 
-## Development
+## Related papers
 
-The essential development history is reflected by the branch `develop` and various feature branches. The bleeding-edge state of the code is usually reflected by the branch `experimental`. Separate branches are used for preparing talks and publications.
+- [An Optimal Control Problem for Single-Spot Pulsed Laser Welding](https://github.com/optipulsproject/paper-onespot)
 
 
 ## License
