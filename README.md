@@ -1,7 +1,7 @@
-OptiPuls: numerical model for single spot pulsed laser beam welding
-===================================================================
+OptiPuls: a numerical model for single spot pulsed laser beam welding
+=====================================================================
 
-This repository contains a numerical model for simulation and optimization of the single spot pulsed laser beam welding of aluminium alloys. Its implementation relies on the [FEniCS computing platform](https://fenicsproject.org/). 
+This repository contains a Python package `optipuls` which implements a numerical model for simulation and mathematical optimization of the single spot pulsed laser beam welding of aluminium alloys. Its implementation strongly relies on the [FEniCS][fenics] computing platform.
 
 ---
 
@@ -16,57 +16,58 @@ This repository contains a numerical model for simulation and optimization of th
 
 ## Requirements
 
-A working [FEniCS](https://fenics.readthedocs.io/en/latest/installation.html) setup is required to run the code as well as `numpy` and `matplotlib` Python packages. ParaView is recommended to visualize the simulation output.
+To run simulations and solve optimization problems, `optipuls` requires a working [FEniCS][fenics/installation] installation. Python packages `numpy`, `scipy` and `matplotlib` must be already installed as FEniCS' dependencies.
 
-One of the easy ways to satisfy the dependencies would be using the official [FEniCS docker images](https://fenics.readthedocs.io/projects/containers/en/latest/).
+[ParaView](https://www.paraview.org/) is recommended to inspect the simulation output.
+
+Notice, that installing FEniCS with its dependencies might be difficult on systems other than Debian or Ubuntu, which are the [officially supported][fenics/installation/ubuntu] by FEniCS developers.
+Therefore, it is recommended to use `optipuls` in a docker container using [optipulsproject/optipuls] docker image which is built on top of [fenicsproject/stable] docker image. Please refer to the section below.
 
 
-## Running simulations and optimizations
+## Installing `optipuls` on the host system
 
-### On bare metal
+Provided FEniCS is correctly deployed on the host system, `optipuls` can be simply installed via `pip`.
 
-If your host system provides the dependencies then you can run a simulation by
+Creating a Python virtual environment and switching to it (optional):
 ```
-python3 run.py [--scratch /path/to/scratch]
+python3 -m venv optipulsenv
+source optipulsenv/bin/activate
 ```
 
-where `/path/to/scratch` is an optional path to the desired directory for the simulation artifacts such as plots, ParaView files, dumped NumPy arrays, log files, etc.
+Installing `optipuls`:
+```
+python3 -m pip install git+https://github.com/optipulsproject/optipuls
+```
 
-For the up-to-date list of command line arguments run `python3 run.py --help`.
 
+### Running `optipuls` in a docker container
 
-### In a docker container
-
-Assuming that `/scratch/optipuls` is the desired location for the simulation artifacts and the dijitso cache, the following command will run a simulation (described in the file `run.py`) in the FEniCS docker container:
+Assuming that `/scratch/optipuls` is the desired location for the numerical artifacts and dijitso cache on the host system, the following command will mount the scratch directory and the current working directory inside a docker container and execute `run.py`:
 ```
 $ docker run \
   -v $(pwd):/home/fenics/shared \
   -v /scratch/optipuls/cache/dijitso:/home/fenics/.cache/dijitso \
   -v /scratch/optipuls:/scratch \
-  quay.io/fenicsproject/stable:latest "cd shared && mkdir -p /scratch/$(git rev-parse --short HEAD) && python3 run.py --scratch /scratch/$(git rev-parse --short HEAD)"
-```
-
-
-## Reproducing numerical experiments
-
-Some commits are tagged as `experiments/*` and typically have neither children nor branches pointing at them. These commits are supposed to represent fully reproducible numerical experiments/simulations. The experiment setting is normally explained in the commit message.
-
-The following command is used to tag a certain commit as an experiment:
-```
-git tag experiments/$(git rev-parse --short HEAD)
-```
-
-Use the following command to list all of such commits:
-```
-git show -s --tags=experiments --decorate --abbrev-commit --pretty=medium
+  optipulsproject/optipuls:latest python3 run.py --scratch /scratch"
 ```
 
 
 ## Related papers
 
-- [An Optimal Control Problem for Single-Spot Pulsed Laser Welding](https://github.com/optipulsproject/paper-onespot)
+- [An Optimal Control Problem for Single-Spot Pulsed Laser Welding][paper-onespot]
 
 
 ## License
 
 The sorce code is licensed under the terms of [GNU GPLv3](https://www.gnu.org/licenses/gpl-3.0.en.html).
+
+
+
+[fenics]: https://fenicsproject.org/
+[fenics/installation]: https://fenics.readthedocs.io/en/latest/installation.html
+[fenics/installation/ubuntu]: https://fenics.readthedocs.io/en/latest/installation.html#debian-ubuntu-packages
+
+[optipulsproject/optipuls]: https://hub.docker.com/r/optipulsproject/optipuls
+[fenicsproject/stable]: https://quay.io/fenicsproject/stable
+
+[paper-onespot]: https://github.com/optipulsproject/paper-onespot
