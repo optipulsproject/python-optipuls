@@ -168,8 +168,12 @@ class Problem:
     def kappa(self):
         try:
             return lambda theta: dolfin.as_matrix(
-                    [[self._kappa_rad(theta), dolfin.Constant(0)],
-                     [dolfin.Constant(0), self._kappa_ax(theta)]])
+                [
+                    [self._kappa_rad(theta) / np.sqrt(2), dolfin.Constant(0), dolfin.Constant(0)],
+                    [dolfin.Constant(0), self._kappa_rad(theta) / np.sqrt(2), dolfin.Constant(0)],
+                    [dolfin.Constant(0), dolfin.Constant(0), self._kappa_ax(theta)],
+                ]
+            )
         except AttributeError:
             raise IncompleteProblemException(
                 'kappa spline must be assigned to complete problem formulation')
@@ -188,7 +192,7 @@ class Problem:
         return core.compute_welding_size(
                     evo,
                     self.V,
-                    self.liquidus,
+                    self.liquidus - dolfin.DOLFIN_EPS,
                     self.space_domain.x,
                     self.space_domain.ds(0),
         )
@@ -197,7 +201,7 @@ class Problem:
         return core.compute_welding_size(
                     evo,
                     self.V,
-                    self.liquidus,
+                    self.liquidus -dolfin.DOLFIN_EPS,
                     self.space_domain.x,
                     self.space_domain.ds(1) + self.space_domain.ds(2),
         )

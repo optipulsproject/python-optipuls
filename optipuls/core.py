@@ -1,7 +1,7 @@
 import dolfin
 from dolfin import dx, Constant, DOLFIN_EPS
 import ufl
-from ufl import inner, grad, conditional, ge, gt, lt, le, And
+from ufl import inner, grad, dot, conditional, ge, gt, lt, le, And
 import numpy as np
 from matplotlib import pyplot as plt
 
@@ -25,7 +25,7 @@ def norm(dt, vector):
     return np.sqrt(norm2(dt, vector))
 
 def integral2(form, x):
-    return form**2 * x[0] * dx
+    return form**2 * dx
 
 def avg(u_k, u_kp1, implicitness):
     return implicitness * u_kp1 + (1 - implicitness) * u_k
@@ -35,10 +35,10 @@ def a(u_k, u_kp1, v, control_k,
       vhc, kappa, cooling_bc, laser_bc, dt, implicitness, x, ds):
     u_avg = avg(u_k, u_kp1, implicitness)
 
-    a_ = vhc(u_k) * (u_kp1 - u_k) * v * x[0] * dx\
-       + dt * inner(kappa(u_k) * grad(u_avg), grad(v)) * x[0] * dx\
-       - dt * laser_bc(control_k) * v * x[0] * ds(1)\
-       - dt * cooling_bc(u_avg) * v * x[0] * (ds(1) + ds(2) + ds(4))
+    a_ = vhc(u_k) * (u_kp1 - u_k) * v * dx\
+       + dt * inner(dot(kappa(u_k), grad(u_avg)), grad(v)) * dx\
+       - dt * laser_bc(control_k) * v * ds(61)\
+       - dt * cooling_bc(u_avg) * v * (ds(62) + ds(62) + ds(64))
 
     return a_
 
@@ -208,7 +208,7 @@ def Dj(evo_adj, control, V, control_ref, beta_control, beta_welding, laser_pd,
 
     for i in range(Nt):
         p.vector().set_local(evo_adj[i])
-        z[i] = dolfin.assemble(p * x[0] * ds(1))
+        z[i] = dolfin.assemble(p * ds(61))
     
     Dj = beta_control * (control - control_ref) - laser_pd*z
 
