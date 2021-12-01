@@ -22,7 +22,7 @@ args = parser.parse_args()
 
 
 # set dolfin parameters
-dolfin.set_log_level(40)
+# dolfin.set_log_level(40)
 dolfin.parameters["form_compiler"]["quadrature_degree"] = 1
 
 
@@ -36,15 +36,15 @@ problem.time_domain = time_domain
 # experimental
 
 mesh = dolfin.Mesh()
-with dolfin.XDMFFile("box.xdmf") as infile:
+with dolfin.XDMFFile("mesh/double_ng.xdmf") as infile:
     infile.read(mesh)
 
 mesh_boundaries = dolfin.MeshValueCollection("size_t", mesh, 2)
-with dolfin.XDMFFile("box_boundaries.xdmf") as infile:
+with dolfin.XDMFFile("mesh/double_ng_boundaries.xdmf") as infile:
     infile.read(mesh_boundaries, "ids")
 
 mesh_subdomains = dolfin.MeshValueCollection("size_t", mesh, 3)
-with dolfin.XDMFFile("box_subdomains.xdmf") as infile:
+with dolfin.XDMFFile("mesh/double_ng_subdomains.xdmf") as infile:
     infile.read(mesh_subdomains, "ids")
 
 space_domain = SpaceDomain(0.0025, 0.0002, 0.0005)
@@ -77,7 +77,7 @@ problem.velocity_max = 0.15
 problem.beta_liquidity = 10**12
 problem.beta_welding = 10**-2
 problem.threshold_temp = 1000.
-problem.target_point = dolfin.Point(0, .7 * space_domain.Z)
+problem.target_point = dolfin.Point(0, 0, .7 * space_domain.Z)
 problem.pow_ = 20
 
 
@@ -99,25 +99,65 @@ kappa_ax = coefficients.construct_kappa_spline(EN_AW_6082_T6, 'ax')
 problem.vhc = vhc
 problem.kappa = (kappa_rad, kappa_ax)
 
-print('Creating a test simulation.')
-test_control = 0.5 + 0.1 * np.sin(0.5 * time_domain.timeline / np.pi)
-test_simulation = Simulation(problem, test_control)
 
-epsilons, deltas_fwd = optimization.gradient_test(
-        test_simulation, eps_init=10**-5, iter_max=15)
-vis.gradient_test_plot(
-        epsilons, deltas_fwd, outfile=args.scratch+'/gradient_test.png')
-print(f'Gradient test complete. See {args.scratch}/gradient_test.png')
+R = 0.0025;
+r = 0.0002;
+overlap = 0.6;
+d = 2 * r * (1 - overlap);
 
-print('Creating an initial simulation.')
-control = np.zeros(time_domain.Nt)
+
+from optipuls.utils.laser import linear_rampdown
+from optipuls.utils.io import save_as_pvd
+
+control = linear_rampdown(time_domain.timeline, t1=0.005, t2=0.010)
 simulation = Simulation(problem, control)
+theta_final = dolfin.Function(problem.V)
+theta_final.set_allow_extrapolation(True)
+theta_final.vector().set_local(simulation.evo[-1])
 
-descent = optimization.gradient_descent(
-        simulation, iter_max=100, step_init=2**-25)
+from optipuls.utils.shiftedexpression import ShiftedExpression
 
-vis.control_plot(
-        descent[-1].control,
-        labels=['Optimal Control'],
-        outfile=args.scratch+'/optimal_control.png')
-print(f'Gradient descent complete. See {args.scratch}/optimal_control.png')
+theta_shifted = ShiftedExpression(
+    expr_interpolate=(lambda p: theta_final(p)),
+    expr_extrapolate=(lambda _: problem.temp_amb),
+    shift=(d, 0, 0),
+    bounding_box_tree=mesh.bounding_box_tree(),
+    )
+
+theta_init_new = dolfin.Function(problem.V)
+theta_init_new = dolfin.interpolate(theta_shifted, problem.V)
+
+
+# print('Creating a test simulation.')
+# test_control = 0.5 + 0.1 * np.sin(0.5 * time_domain.timeline / np.pi)
+# test_simulation = Simulation(problem, test_control)
+
+# epsilons, deltas_fwd = optimization.gradient_test(
+#         test_simulation, eps_init=10**-5, iter_max=15)
+# vis.gradient_test_plot(
+#         epsilons, deltas_fwd, outfile=args.scratch+'/gradient_test.png')
+# print(f'Gradient test complete. See {args.scratch}/gradient_test.png')
+
+
+
+
+# print('A linear rampdown simulation.')
+# control = linear_rampdown(time_domain.timeline, t1=0.005, t2=0.010)
+# simulation = Simulation(problem, control)
+# save_as_pvd(simulation.evo, problem.V, 'output/evo.pvd')
+
+# print('Creating an initial simulation.')
+# control = np.zeros(time_domain.Nt)
+# simulation = Simulation(problem, control)
+
+# descent = optimization.gradient_descent(
+#         simulation, iter_max=20, step_init=2**-25)
+
+# vis.control_plot(
+#         descent[-1].control,
+#         labels=['Optimal Control'],
+#         outfile=args.scratch+'/optimal_control.png')
+# print(f'Gradient descent complete. See {args.scratch}/optimal_control.png')
+
+# optimized = descent[-1]
+# save_as_pvd(optimized.evo, problem.V, 'output/optimized.pvd')
