@@ -31,11 +31,15 @@ class Problem:
     def a(self, u_k, u_kp1, v, control_k):
         return core.a(
                 u_k, u_kp1, v, control_k,
-                self.vhc, self.kappa, self.cooling_bc, self.laser_bc,
+                self.vhc, self.kappa, self.cooling_bc,
+                lambda x: core.uniform_density(
+                    x,
+                    self.space_domain.R_laser,
+                    ) * self.laser_pd,
                 self.time_domain.dt, self.implicitness,
                 self.space_domain.x, self.space_domain.ds)
 
-    def laser_bc(self, control_k):
+    def bc_laser(self, control_k):
         return core.laser_bc(control_k, self.laser_pd)
 
     def cooling_bc(self, theta):
@@ -50,7 +54,10 @@ class Problem:
                 self.control_ref,
                 self.beta_control,
                 self.beta_welding,
-                self.laser_pd,
+                lambda x: core.uniform_density(
+                    x,
+                    self.space_domain.R_laser,
+                    ) * self.laser_pd,
                 self.space_domain.x,
                 self.space_domain.ds)
 
@@ -169,8 +176,8 @@ class Problem:
         try:
             return lambda theta: dolfin.as_matrix(
                 [
-                    [self._kappa_rad(theta) / np.sqrt(2), dolfin.Constant(0), dolfin.Constant(0)],
-                    [dolfin.Constant(0), self._kappa_rad(theta) / np.sqrt(2), dolfin.Constant(0)],
+                    [self._kappa_rad(theta), dolfin.Constant(0), dolfin.Constant(0)],
+                    [dolfin.Constant(0), self._kappa_rad(theta), dolfin.Constant(0)],
                     [dolfin.Constant(0), dolfin.Constant(0), self._kappa_ax(theta)],
                 ]
             )

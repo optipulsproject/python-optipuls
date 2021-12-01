@@ -3,17 +3,22 @@ from dolfin import dx, Constant, DOLFIN_EPS
 import ufl
 from ufl import inner, grad, dot, conditional, ge, gt, lt, le, And
 import numpy as np
-from matplotlib import pyplot as plt
-
 
 def laser_bc(control_k, laser_pd):
     return laser_pd * Constant(control_k)
 
+def gaussian_density(x, sigma, mu):
+    pass
+
+def uniform_density(x, radius, center=(0,0)):
+    return conditional(
+        le((x[0] - center[0])**2 + (x[1] - center[1])**2, radius**2),
+        1., 0.
+        )
 
 def cooling_bc(theta, temp_amb, convection_coeff, radiation_coeff):
     return - convection_coeff * (theta - temp_amb)\
            - radiation_coeff * (theta**4 - temp_amb**4)
-
 
 def norm2(dt, vector):
     '''Calculates the squared L2[0,T] norm.'''
@@ -33,12 +38,43 @@ def avg(u_k, u_kp1, implicitness):
 
 def a(u_k, u_kp1, v, control_k,
       vhc, kappa, cooling_bc, laser_bc, dt, implicitness, x, ds):
+    '''UFL form for the lhs of the forward equation (one time step).
+
+    Parameters:
+        u_k, u_kp1 (dolfin.Function):
+            Two consequent states of the temperature distribution, i.e. the
+            current (known) and the next (unknow) time steps.
+        v (dolfin.TestFunction):
+            A test function.
+        control_k (float):
+            The control value for the current time step.
+        vhc (UFLSpline, i.e. dolfin.Function -> UFL form):
+            Effective volumetric heat capacity coefficient.
+        kappa (UFLSpline, i.e. dolfin.Function -> UFL form):
+            Thermal conductivity coefficient. Must be a NxN matrix or a 1xN
+            vector where N is the dimension of the space domain.
+        cooling_bc (dolfin.Function -> UFL form):
+            Cooling boundary condition.
+        laser (float -> UFL form):
+            Laser (energy input) boundary condition.
+        dt (float):
+            Length of the time step.
+        implicitness (float):
+            Implicitness coefficient.
+        x (dolfin.SpatialCoordinate):
+            Spartial coordinate inside the domain.
+        ds (dolfin.Measure):
+            Measure on the boundaries of the domain with the following markers:
+            (1) boundary affected by laser's radiation;
+            (2) boundary affected by cooling only.
+
+    '''
     u_avg = avg(u_k, u_kp1, implicitness)
 
     a_ = vhc(u_k) * (u_kp1 - u_k) * v * dx\
        + dt * inner(dot(kappa(u_k), grad(u_avg)), grad(v)) * dx\
-       - dt * laser_bc(control_k) * v * ds(61)\
-       - dt * cooling_bc(u_avg) * v * (ds(62) + ds(62) + ds(64))
+       - dt * Constant(control_k) * laser_bc(x) * v * ds(61)\
+       - dt * cooling_bc(u_avg) * v * (ds(61) + ds(62))
 
     return a_
 
@@ -55,7 +91,7 @@ def solve_forward(a, V, theta_init, control):
 
     Parameters:
         a: (u_k, u_kp1, v, control_k) -> UFL form
-            The RHS variational form.
+            The lhs variational form.
         V: dolfin.FunctionSpace
             The FEM space of the problem being solved.
         theta_init: dolfin.Function(V)
@@ -66,7 +102,8 @@ def solve_forward(a, V, theta_init, control):
     Returns:
         evo: ndarray
             The coefficients of the calculated solution in the basis of
-            the space V at each time step including the given initial state.
+            the space V at each time step including the given initial state,
+            i.e. len(evo) == len(control) + 1.
             
     '''
 
@@ -208,9 +245,9 @@ def Dj(evo_adj, control, V, control_ref, beta_control, beta_welding, laser_pd,
 
     for i in range(Nt):
         p.vector().set_local(evo_adj[i])
-        z[i] = dolfin.assemble(p * ds(61))
+        z[i] = dolfin.assemble(p * laser_pd(x) * ds(61))
     
-    Dj = beta_control * (control - control_ref) - laser_pd*z
+    Dj = beta_control * (control - control_ref) - z
 
     return Dj
 
