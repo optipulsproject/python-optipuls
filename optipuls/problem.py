@@ -156,33 +156,25 @@ class Problem:
         try:
             return self._vhc
         except AttributeError:
-            raise IncompleteProblemException(
-                'vhc spline must be assigned to complete problem formulation')
-
-    @vhc.setter
-    def vhc(self, spline):
-        self._vhc = UFLSpline(spline, self.V.ufl_element())
-
+            self._vhc = UFLSpline(self.material.vhc, self.V.ufl_element())
+            return self._vhc
 
     @property
     def kappa(self):
         try:
-            return lambda theta: dolfin.as_matrix(
-                    [[self._kappa_rad(theta), dolfin.Constant(0)],
-                     [dolfin.Constant(0), self._kappa_ax(theta)]])
+            return self._kappa
         except AttributeError:
-            raise IncompleteProblemException(
-                'kappa spline must be assigned to complete problem formulation')
+            kappa_rad_uflspline = UFLSpline(
+                self.material.kappa[0], self.V.ufl_element()
+                )
+            kappa_ax_uflspline = UFLSpline(
+                self.material.kappa[1], self.V.ufl_element()
+                )
+            self._kappa = lambda theta: dolfin.as_matrix(
+                    [[kappa_rad_uflspline(theta), dolfin.Constant(0)],
+                     [dolfin.Constant(0), kappa_ax_uflspline(theta)]])
 
-    @kappa.setter
-    def kappa(self, splines):
-        try:
-            spline_rad, spline_ax = splines
-        except:
-            raise ValueError('Two splines must be provided to construct kappa')
-
-        self._kappa_rad = UFLSpline(spline_rad, self.V.ufl_element())
-        self._kappa_ax = UFLSpline(spline_ax, self.V.ufl_element())
+            return self._kappa
 
     def compute_welding_depth(self, evo):
         return core.compute_welding_size(
