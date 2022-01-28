@@ -7,11 +7,11 @@ import numpy as np
 import optipuls.visualization as vis
 from optipuls.simulation import Simulation
 from optipuls.problem import Problem
-import optipuls.coefficients as coefficients
 import optipuls.material as material
 import optipuls.optimization as optimization
 from optipuls.time import TimeDomain
 from optipuls.space import SpaceDomain
+from optipuls.material import Material
 
 
 # parse command line arguments
@@ -66,15 +66,7 @@ problem.V1 = dolfin.FunctionSpace(space_domain.mesh, "DG", 0)
 problem.theta_init = dolfin.project(problem.temp_amb, problem.V)
 
 
-# read the material properties and initialize equation coefficients
-dummy_material = material.from_file('materials/dummy.json')
-
-vhc, _ = coefficients.construct_vhc_spline(dummy_material)
-kappa_rad = coefficients.construct_kappa_spline(dummy_material, 'rad')
-kappa_ax = coefficients.construct_kappa_spline(dummy_material, 'ax')
-
-problem.vhc = vhc
-problem.kappa = (kappa_rad, kappa_ax)
+problem.material = Material.load('EN_AW-6082_T6.json')
 
 # print('Creating a test simulation.')
 # test_control = 0.5 + 0.1 * np.sin(0.5 * time_domain.timeline / np.pi)
@@ -87,17 +79,19 @@ problem.kappa = (kappa_rad, kappa_ax)
 # print(f'Gradient test complete. See {args.scratch}/gradient_test.png')
 
 print('Creating an initial simulation.')
-control = np.zeros(time_domain.Nt)
+# control = np.zeros(time_domain.Nt)
+from optipuls.utils.laser import linear_rampdown
+control = linear_rampdown(time_domain.timeline)
 simulation = Simulation(problem, control)
 
-descent = optimization.gradient_descent(
-        simulation, iter_max=100, step_init=2**-25)
+# descent = optimization.gradient_descent(
+#         simulation, iter_max=100, step_init=2**-25)
 
-vis.control_plot(
-        descent[-1].control,
-        labels=['Optimal Control'],
-        outfile=args.scratch+'/optimal_control.png')
-print(f'Gradient descent complete. See {args.scratch}/optimal_control.png')
+# vis.control_plot(
+#         descent[-1].control,
+#         labels=['Optimal Control'],
+#         outfile=args.scratch+'/optimal_control.png')
+# print(f'Gradient descent complete. See {args.scratch}/optimal_control.png')
 
 # from optipuls.utils.laser import linear_rampdown
 # control = linear_rampdown(time_domain.timeline, 0.005, 0.010)
