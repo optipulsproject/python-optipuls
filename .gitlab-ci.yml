@@ -4,7 +4,10 @@ before_script:
 docker build:
   image: docker:stable
   script:
-    - docker build . -f docker/Dockerfile.optipuls -t optipulsproject/optipuls:$CI_COMMIT_REF_SLUG -t optipulsproject/optipuls:latest
+    - docker build . -f docker/Dockerfile.optipuls
+      -t optipulsproject/optipuls:$CI_COMMIT_SHORT_SHA
+      -t optipulsproject/optipuls:$CI_COMMIT_REF_SLUG
+      -t optipulsproject/optipuls:latest
   only:
     refs:
       - develop
