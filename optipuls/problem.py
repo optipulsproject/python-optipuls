@@ -58,7 +58,7 @@ class Problem:
         return core.compute_evo_vel(
                 evo,
                 self.V, self.V1, self.time_domain.dt,
-                self.liquidus, self.solidus, velocity_max)
+                self.material.liquidus, self.material.solidus, velocity_max)
 
     def compute_ps_magnitude(self, evo):
         return core.compute_ps_magnitude(
@@ -77,14 +77,14 @@ class Problem:
         return core.velocity(
                 theta_k, theta_kp1,
                 dt=self.time_domain.dt,
-                liquidus=self.liquidus,
-                solidus=self.solidus,
+                liquidus=self.material.liquidus,
+                solidus=self.material.solidus,
                 velocity_max=self.velocity_max)
 
     def liquidity(self, theta_k, theta_kp1):
         return core.liquidity(
                 theta_k, theta_kp1,
-                solidus=self.solidus)
+                solidus=self.material.solidus)
 
     def penalty_welding(self, evo, control):
         return core.penalty_welding(
@@ -180,7 +180,7 @@ class Problem:
         return core.compute_welding_size(
                     evo,
                     self.V,
-                    self.liquidus,
+                    self.material.liquidus,
                     self.space_domain.x,
                     self.space_domain.ds(0),
         )
@@ -189,7 +189,7 @@ class Problem:
         return core.compute_welding_size(
                     evo,
                     self.V,
-                    self.liquidus,
+                    self.material.liquidus,
                     self.space_domain.x,
                     self.space_domain.ds(1) + self.space_domain.ds(2),
         )
