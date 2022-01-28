@@ -1,5 +1,9 @@
-from functools import cached_property
-from importlib.resources import is_resource, read_text
+try:
+    from importlib.resources import read_text
+except ImportError:
+    # Try backported to PY<37 `importlib_resources`.
+    from importlib_resources import read_text
+
 import json
 import numpy as np
 
