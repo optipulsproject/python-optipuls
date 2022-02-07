@@ -445,3 +445,23 @@ def compute_welding_size(evo, V, threshold_temp, x, ds):
         )
 
     return evo_size
+
+
+def p_norm(vector, p):
+    return (np.abs(vector)**p).sum() ** (1./p)
+
+def p_norm_robust(vector, p):
+    value_max = np.abs(vector).max()
+    return value_max * p_norm(vector / value_max, p)
+
+def get_values(evo, V, point):
+    # why not using evo[0]?
+    Nt = len(evo) - 1
+    theta_k = dolfin.Function(V)
+    values = np.empty(Nt)
+
+    for k in range(0, Nt):
+        theta_k.vector().set_local(evo[k+1])
+        values[k] = theta_k(point)
+
+    return values
