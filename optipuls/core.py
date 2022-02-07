@@ -381,20 +381,12 @@ def compute_evo_vel(evo, V, V1, dt, liquidus, solidus, velocity_max):
 
 def compute_ps_magnitude(
         evo, V, target_point, threshold_temp, beta_welding, pow_):
-    theta_kp1 = dolfin.Function(V)
+    values = get_values(evo, V, target_point)
+    magnitude = values ** (pow_ - 1)
 
-    Nt = len(evo) - 1
-    magnitude = np.zeros(Nt)
-
-    sum_ = 0
-    for k in range(0, Nt):
-        theta_kp1.vector().set_local(evo[k+1])
-        sum_ += theta_kp1(target_point) ** pow_
-        magnitude[k] = theta_kp1(target_point) ** (pow_ - 1)
-
-    p_norm = sum_ ** (1 / pow_)
-    magnitude_common = beta_welding * (p_norm - threshold_temp)\
-                     * sum_ ** (1/pow_ - 1)
+    p_norm_ = p_norm_robust(values, pow_)
+    magnitude_common = beta_welding * (p_norm_ - threshold_temp)\
+                     * (values ** pow_).sum() ** (1/pow_ - 1)
     magnitude *= - magnitude_common
 
     return magnitude
