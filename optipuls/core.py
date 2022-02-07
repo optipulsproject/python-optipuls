@@ -219,13 +219,9 @@ def penalty_welding(evo, control,
                     V, beta_welding, target_point, threshold_temp, pow_):
     '''Penalty due to the maximal temperature at the target point.'''
 
-    sum_ = 0
-    theta = dolfin.Function(V)
-    for k in range(len(evo)):
-        theta.vector().set_local(evo[k])
-        sum_ += np.float_power(theta(target_point), pow_)
-    norm = np.float_power(sum_, 1/pow_)
-    result = .5 * beta_welding * (norm - threshold_temp)**2
+    values = get_values(evo, V, target_point)
+    p_norm_ = p_norm_robust(values, pow_)
+    result = .5 * beta_welding * (p_norm_ - threshold_temp)**2
 
     return result
 
