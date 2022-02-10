@@ -382,17 +382,13 @@ def compute_ps_magnitude(
 
     if pow_ == np.inf:
         value_max = values.max()
-        magnitude = np.where(values == value_max, 1., 0.)
-        magnitude *= - beta_welding * (value_max - threshold_temp)
+        magnitude = - beta_welding * (value_max - threshold_temp) \
+                  * np.where(values == value_max, 1., 0.)
         return magnitude
 
-    # this still needs a workaround to avoid overflow
-    magnitude = values ** (pow_ - 1)
-
     p_norm_ = p_norm_robust(values, pow_)
-    magnitude_common = beta_welding * (p_norm_ - threshold_temp)\
-                     * (values ** pow_).sum() ** (1/pow_ - 1)
-    magnitude *= - magnitude_common
+    magnitude = - beta_welding * (p_norm_ - threshold_temp) \
+              * (values / p_norm_) ** (pow_ - 1.)
 
     return magnitude
 
