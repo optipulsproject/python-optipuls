@@ -3,7 +3,8 @@ from dolfin import dx, Constant, DOLFIN_EPS
 import ufl
 from ufl import inner, grad, conditional, ge, gt, lt, le, And
 import numpy as np
-from matplotlib import pyplot as plt
+
+from .utils.iterators import get_func_values
 
 
 def laser_bc(control_k, laser_pd):
@@ -219,13 +220,9 @@ def penalty_welding(evo, control,
                     V, beta_welding, target_point, threshold_temp, pow_):
     '''Penalty due to the maximal temperature at the target point.'''
 
-    sum_ = 0
-    theta = dolfin.Function(V)
-    for k in range(len(evo)):
-        theta.vector().set_local(evo[k])
-        sum_ += np.float_power(theta(target_point), pow_)
-    norm = np.float_power(sum_, 1/pow_)
-    result = .5 * beta_welding * (norm - threshold_temp)**2
+    values = get_func_values(evo, V, target_point)
+    p_norm_ = p_norm_robust(values, pow_)
+    result = .5 * beta_welding * (p_norm_ - threshold_temp)**2
 
     return result
 
@@ -381,20 +378,20 @@ def compute_evo_vel(evo, V, V1, dt, liquidus, solidus, velocity_max):
 
 def compute_ps_magnitude(
         evo, V, target_point, threshold_temp, beta_welding, pow_):
-    theta_kp1 = dolfin.Function(V)
+    values = get_func_values(evo[1:], V, target_point)  # is evo[1:] correct here?
 
-    Nt = len(evo) - 1
-    magnitude = np.zeros(Nt)
+    if pow_ == np.inf:
+        value_max = values.max()
+        magnitude = np.where(values == value_max, 1., 0.)
+        magnitude *= - beta_welding * (value_max - threshold_temp)
+        return magnitude
 
-    sum_ = 0
-    for k in range(0, Nt):
-        theta_kp1.vector().set_local(evo[k+1])
-        sum_ += theta_kp1(target_point) ** pow_
-        magnitude[k] = theta_kp1(target_point) ** (pow_ - 1)
+    # this still needs a workaround to avoid overflow
+    magnitude = values ** (pow_ - 1)
 
-    p_norm = sum_ ** (1 / pow_)
-    magnitude_common = beta_welding * (p_norm - threshold_temp)\
-                     * sum_ ** (1/pow_ - 1)
+    p_norm_ = p_norm_robust(values, pow_)
+    magnitude_common = beta_welding * (p_norm_ - threshold_temp)\
+                     * (values ** pow_).sum() ** (1/pow_ - 1)
     magnitude *= - magnitude_common
 
     return magnitude
@@ -445,3 +442,15 @@ def compute_welding_size(evo, V, threshold_temp, x, ds):
         )
 
     return evo_size
+
+
+def p_norm(vector, p):
+    return (np.abs(vector)**p).sum() ** (1./p)
+
+
+def p_norm_robust(vector, p):
+    value_max = np.abs(vector).max()
+    if p == np.inf:
+        return value_max
+    else:
+        return value_max * p_norm(vector / value_max, p)
