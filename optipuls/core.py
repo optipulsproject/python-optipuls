@@ -3,7 +3,8 @@ from dolfin import dx, Constant, DOLFIN_EPS
 import ufl
 from ufl import inner, grad, conditional, ge, gt, lt, le, And
 import numpy as np
-from matplotlib import pyplot as plt
+
+from .utils.iterators import get_func_values
 
 
 def laser_bc(control_k, laser_pd):
@@ -219,7 +220,7 @@ def penalty_welding(evo, control,
                     V, beta_welding, target_point, threshold_temp, pow_):
     '''Penalty due to the maximal temperature at the target point.'''
 
-    values = get_values(evo, V, target_point)
+    values = get_func_values(evo, V, target_point)
     p_norm_ = p_norm_robust(values, pow_)
     result = .5 * beta_welding * (p_norm_ - threshold_temp)**2
 
@@ -377,7 +378,15 @@ def compute_evo_vel(evo, V, V1, dt, liquidus, solidus, velocity_max):
 
 def compute_ps_magnitude(
         evo, V, target_point, threshold_temp, beta_welding, pow_):
-    values = get_values(evo, V, target_point)
+    values = get_func_values(evo[1:], V, target_point)  # is evo[1:] correct here?
+
+    if pow_ == np.inf:
+        value_max = values.max()
+        magnitude = np.where(values == value_max, 1., 0.)
+        magnitude *= - beta_welding * (value_max - threshold_temp)
+        return magnitude
+
+    # this still needs a workaround to avoid overflow
     magnitude = values ** (pow_ - 1)
 
     p_norm_ = p_norm_robust(values, pow_)
@@ -438,18 +447,10 @@ def compute_welding_size(evo, V, threshold_temp, x, ds):
 def p_norm(vector, p):
     return (np.abs(vector)**p).sum() ** (1./p)
 
+
 def p_norm_robust(vector, p):
     value_max = np.abs(vector).max()
-    return value_max * p_norm(vector / value_max, p)
-
-def get_values(evo, V, point):
-    # why not using evo[0]?
-    Nt = len(evo) - 1
-    theta_k = dolfin.Function(V)
-    values = np.empty(Nt)
-
-    for k in range(0, Nt):
-        theta_k.vector().set_local(evo[k+1])
-        values[k] = theta_k(point)
-
-    return values
+    if p == np.inf:
+        return value_max
+    else:
+        return value_max * p_norm(vector / value_max, p)
