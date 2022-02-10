@@ -1,5 +1,7 @@
-from .core import project_Dj
 from numpy import sqrt
+
+from .core import project_Dj
+from .utils.iterators import get_func_values
 
 
 class Simulation():
@@ -166,14 +168,13 @@ class Simulation():
             return self._temp_target_point_vector
         except AttributeError:
             self._temp_target_point_vector = \
-                self.problem.temp_target_point_vector(self.evo)
+                self.temp_at_point_vector(self.problem.target_point)
             return self._temp_target_point_vector
 
     def temp_at_point_vector(self, point):
         '''Provides the temperature evolution at a given point.'''
 
-        return self.problem.temp_at_point_vector(self.evo, point)
-
+        return get_func_values(self.evo, self.problem.V, point)
 
     @property
     def energy_total(self):

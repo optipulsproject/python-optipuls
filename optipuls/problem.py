@@ -116,22 +116,6 @@ class Problem:
 
         return cost
 
-    def temp_target_point_vector(self, evo):
-        '''Provides the temperature evolution at the target_point.'''
-
-        return core.temp_at_point_vector(
-                evo,
-                V=self.V,
-                point=self.target_point)
-
-    def temp_at_point_vector(self, evo, point):
-        '''Provides the temperature evolution at a given point.'''
-
-        return core.temp_at_point_vector(
-                evo,
-                V=self.V,
-                point=point)
-
     def integral2(self, form):
         x = self.space_domain.x
         return core.integral2(form, x)
