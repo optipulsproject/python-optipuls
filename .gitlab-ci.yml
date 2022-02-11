@@ -28,6 +28,15 @@ docker push:
 
 unittest:
   stage: test
-  image: optipulsproject/optipuls:latest
+  image: optipulsproject/optipuls:$CI_COMMIT_SHORT_SHA
   script:
     - python3 -m unittest discover -s tests/unit
+
+gradient_test:
+  stage: test
+  image: optipulsproject/optipuls:$CI_COMMIT_SHORT_SHA
+  script:
+    - python3 tests/integration/gradient_test.py --outdir ./output
+  artifacts:
+    paths:
+      - ./output/gradient_test.png
