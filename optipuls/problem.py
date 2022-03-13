@@ -73,13 +73,15 @@ class Problem:
         return core.vectorize_penalty_term(
                 evo, self.V, penalty_term, *args, **kwargs)
 
-    def velocity(self, theta_k, theta_kp1):
+    def velocity(self, theta_k, theta_kp1, **kwargs):
         return core.velocity(
                 theta_k, theta_kp1,
                 dt=self.time_domain.dt,
                 liquidus=self.material.liquidus,
                 solidus=self.material.solidus,
-                velocity_max=self.velocity_max)
+                velocity_max=self.velocity_max,
+                **kwargs,
+                )
 
     def liquidity(self, theta_k, theta_kp1):
         return core.liquidity(
@@ -115,6 +117,10 @@ class Problem:
              + self.penalty_welding(evo, control)
 
         return cost
+
+    def integral(self, form):
+        x = self.space_domain.x
+        return core.integral(form, x)
 
     def integral2(self, form):
         x = self.space_domain.x
