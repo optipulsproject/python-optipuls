@@ -17,7 +17,7 @@ def func_pair_generator(evo, V):
     for coefs in evo[1:]:
         theta_next.vector().set_local(coefs)
         yield theta_curr, theta_next 
-        self.theta_curr.assign(theta_next)
+        theta_curr.assign(theta_next)
 
 
 def values_generator(evo, V, point):
