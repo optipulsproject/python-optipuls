@@ -3,6 +3,12 @@ from dolfin import dx, Constant, DOLFIN_EPS
 import ufl
 from ufl import inner, grad, dot, conditional, ge, gt, lt, le, And
 import numpy as np
+from .utils.iterators import (
+        func_generator,
+        func_pair_generator,
+        get_func_values,
+    )
+
 
 def laser_bc(control_k, laser_pd):
     return laser_pd * Constant(control_k)
@@ -28,6 +34,9 @@ def norm2(dt, vector):
 def norm(dt, vector):
     '''Calculates L2[0,T] norm.'''
     return np.sqrt(norm2(dt, vector))
+
+def integral(form, x):
+    return form * x[0] * dx
 
 def integral2(form, x):
     return form**2 * dx
@@ -256,13 +265,9 @@ def penalty_welding(evo, control,
                     V, beta_welding, target_point, threshold_temp, pow_):
     '''Penalty due to the maximal temperature at the target point.'''
 
-    sum_ = 0
-    theta = dolfin.Function(V)
-    for k in range(len(evo)):
-        theta.vector().set_local(evo[k])
-        sum_ += np.float_power(theta(target_point), pow_)
-    norm = np.float_power(sum_, 1/pow_)
-    result = .5 * beta_welding * (norm - threshold_temp)**2
+    values = get_func_values(evo, V, target_point)
+    p_norm_ = p_norm_robust(values, pow_)
+    result = .5 * beta_welding * (p_norm_ - threshold_temp)**2
 
     return result
 
@@ -286,22 +291,16 @@ def vectorize_penalty_term(evo, V, penalty_term, *args, **kwargs):
 
     '''
 
-    theta_k = dolfin.Function(V)
-    theta_kp1 = dolfin.Function(V)
-
-    Nt = len(evo) - 1
-    penalty_vector = np.zeros(Nt)
-
-    theta_k.vector().set_local(evo[0])
-    for k in range(Nt):
-        theta_kp1.vector().set_local(evo[k+1])
-        penalty = penalty_term(k, theta_k, theta_kp1, *args, **kwargs)
-        if penalty:
-            penalty_vector[k] = dolfin.assemble(penalty)
-        theta_k.assign(theta_kp1)
-
-    return penalty_vector
-
+    return np.fromiter(
+            (
+                (lambda p: dolfin.assemble(p) if p else 0.)(
+                        penalty_term(k, theta_k, theta_kp1, *args, **kwargs)
+                    )
+                for k, (theta_k, theta_kp1) in enumerate(func_pair_generator(evo, V))
+            ),
+            dtype=np.float64,
+            count=(len(evo) - 1),
+        )
 
 def temp_at_point_vector(evo, V, point):
     '''Provides the temperature evolution at a given point.
@@ -331,7 +330,36 @@ def temp_at_point_vector(evo, V, point):
     return temp_vector
 
 
-def velocity(theta_k, theta_kp1, dt, liquidus, solidus, velocity_max):
+def solidification_indicator(theta_k, theta_kp1, solidus, liquidus):
+    return conditional(
+            And(ge(theta_k, solidus), lt(theta_kp1, liquidus)),
+            1.,
+            0.,
+        )
+
+
+def velocity_expression(theta_k, theta_kp1, dt):
+    theta_avg = avg(theta_k, theta_kp1, implicitness=.5)
+
+    velocity_form_ = (
+            (theta_kp1 - theta_k) / dt
+            / ufl.sqrt(inner(grad(theta_avg), grad(theta_avg)) + DOLFIN_EPS)
+        )
+
+    return velocity_form_
+
+
+def velocity(
+        theta_k, theta_kp1,
+        dt,
+        liquidus, solidus,
+        velocity_max=0.,
+        filter_solidification=True,
+        mean=False,
+        filter_negative=True,
+        inverse_sign=True,
+        x=None,
+        ):
     '''Provides the UFL form of the velocity function.
 
     Parameters:
@@ -352,18 +380,24 @@ def velocity(theta_k, theta_kp1, dt, liquidus, solidus, velocity_max):
 
     '''
 
-    theta_avg = avg(theta_k, theta_kp1, implicitness=.5)
-    grad_norm = ufl.sqrt(inner(grad(theta_avg), grad(theta_avg)) + DOLFIN_EPS)
-    form = (theta_kp1 - theta_k) / dt / grad_norm
-    # filter to negative values over velocity_max in the solidus-liquidus
-    # corridor and invert the sign
-    form += dolfin.Constant(velocity_max)
-    form *= conditional(le(form, 0.), 1., 0.)
-    form *= conditional(
-            And(ge(theta_k, solidus), lt(theta_kp1, liquidus)), 1., 0.)
-    form *= -1
+    velocity_ = velocity_expression(theta_k, theta_kp1, dt) \
+              + dolfin.Constant(velocity_max)
 
-    return form
+    if filter_solidification:
+        ind = solidification_indicator(theta_k, theta_kp1, solidus, liquidus)
+        velocity_ *= ind
+        if mean:
+            area = dolfin.assemble(integral(ind, x))
+            if area > 0:
+                velocity_ /= area
+
+    if filter_negative:
+        velocity_ *= conditional(le(velocity_, 0.), 1., 0.)
+
+    if inverse_sign:
+        velocity_ *= -1
+
+    return velocity_
 
 
 def liquidity(theta_k, theta_kp1, solidus, implicitness=1.):
@@ -418,21 +452,17 @@ def compute_evo_vel(evo, V, V1, dt, liquidus, solidus, velocity_max):
 
 def compute_ps_magnitude(
         evo, V, target_point, threshold_temp, beta_welding, pow_):
-    theta_kp1 = dolfin.Function(V)
+    values = get_func_values(evo[1:], V, target_point)  # is evo[1:] correct here?
 
-    Nt = len(evo) - 1
-    magnitude = np.zeros(Nt)
+    if pow_ == np.inf:
+        value_max = values.max()
+        magnitude = - beta_welding * (value_max - threshold_temp) \
+                  * np.where(values == value_max, 1., 0.)
+        return magnitude
 
-    sum_ = 0
-    for k in range(0, Nt):
-        theta_kp1.vector().set_local(evo[k+1])
-        sum_ += theta_kp1(target_point) ** pow_
-        magnitude[k] = theta_kp1(target_point) ** (pow_ - 1)
-
-    p_norm = sum_ ** (1 / pow_)
-    magnitude_common = beta_welding * (p_norm - threshold_temp)\
-                     * sum_ ** (1/pow_ - 1)
-    magnitude *= - magnitude_common
+    p_norm_ = p_norm_robust(values, pow_)
+    magnitude = - beta_welding * (p_norm_ - threshold_temp) \
+              * (values / p_norm_) ** (pow_ - 1.)
 
     return magnitude
 
@@ -482,3 +512,15 @@ def compute_welding_size(evo, V, threshold_temp, x, ds):
         )
 
     return evo_size
+
+
+def p_norm(vector, p):
+    return (np.abs(vector)**p).sum() ** (1./p)
+
+
+def p_norm_robust(vector, p):
+    value_max = np.abs(vector).max()
+    if p == np.inf:
+        return value_max
+    else:
+        return value_max * p_norm(vector / value_max, p)

@@ -7,11 +7,11 @@ import numpy as np
 import optipuls.visualization as vis
 from optipuls.simulation import Simulation
 from optipuls.problem import Problem
-import optipuls.coefficients as coefficients
 import optipuls.material as material
 import optipuls.optimization as optimization
 from optipuls.time import TimeDomain
 from optipuls.space import SpaceDomain
+from optipuls.material import Material
 
 
 # parse command line arguments
@@ -89,15 +89,8 @@ problem.theta_init = dolfin.project(problem.temp_amb, problem.V)
 
 ########################################
 
-# read the material properties and initialize equation coefficients
-EN_AW_6082_T6 = material.from_file('materials/EN_AW-6082_T6.json')
 
-vhc, _ = coefficients.construct_vhc_spline(EN_AW_6082_T6)
-kappa_rad = coefficients.construct_kappa_spline(EN_AW_6082_T6, 'rad')
-kappa_ax = coefficients.construct_kappa_spline(EN_AW_6082_T6, 'ax')
-
-problem.vhc = vhc
-problem.kappa = (kappa_rad, kappa_ax)
+problem.material = Material.load('EN_AW-6082_T6.json')
 
 
 R = 0.0025;
@@ -137,8 +130,6 @@ theta_init_new = dolfin.interpolate(theta_shifted, problem.V)
 # vis.gradient_test_plot(
 #         epsilons, deltas_fwd, outfile=args.scratch+'/gradient_test.png')
 # print(f'Gradient test complete. See {args.scratch}/gradient_test.png')
-
-
 
 
 # print('A linear rampdown simulation.')

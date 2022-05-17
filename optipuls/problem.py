@@ -65,7 +65,7 @@ class Problem:
         return core.compute_evo_vel(
                 evo,
                 self.V, self.V1, self.time_domain.dt,
-                self.liquidus, self.solidus, velocity_max)
+                self.material.liquidus, self.material.solidus, velocity_max)
 
     def compute_ps_magnitude(self, evo):
         return core.compute_ps_magnitude(
@@ -80,18 +80,20 @@ class Problem:
         return core.vectorize_penalty_term(
                 evo, self.V, penalty_term, *args, **kwargs)
 
-    def velocity(self, theta_k, theta_kp1):
+    def velocity(self, theta_k, theta_kp1, **kwargs):
         return core.velocity(
                 theta_k, theta_kp1,
                 dt=self.time_domain.dt,
-                liquidus=self.liquidus,
-                solidus=self.solidus,
-                velocity_max=self.velocity_max)
+                liquidus=self.material.liquidus,
+                solidus=self.material.solidus,
+                velocity_max=self.velocity_max,
+                **kwargs,
+                )
 
     def liquidity(self, theta_k, theta_kp1):
         return core.liquidity(
                 theta_k, theta_kp1,
-                solidus=self.solidus)
+                solidus=self.material.solidus)
 
     def penalty_welding(self, evo, control):
         return core.penalty_welding(
@@ -123,21 +125,9 @@ class Problem:
 
         return cost
 
-    def temp_target_point_vector(self, evo):
-        '''Provides the temperature evolution at the target_point.'''
-
-        return core.temp_at_point_vector(
-                evo,
-                V=self.V,
-                point=self.target_point)
-
-    def temp_at_point_vector(self, evo, point):
-        '''Provides the temperature evolution at a given point.'''
-
-        return core.temp_at_point_vector(
-                evo,
-                V=self.V,
-                point=point)
+    def integral(self, form):
+        x = self.space_domain.x
+        return core.integral(form, x)
 
     def integral2(self, form):
         x = self.space_domain.x
@@ -163,43 +153,31 @@ class Problem:
         try:
             return self._vhc
         except AttributeError:
-            raise IncompleteProblemException(
-                'vhc spline must be assigned to complete problem formulation')
-
-    @vhc.setter
-    def vhc(self, spline):
-        self._vhc = UFLSpline(spline, self.V.ufl_element())
-
+            self._vhc = UFLSpline(self.material.vhc, self.V.ufl_element())
+            return self._vhc
 
     @property
     def kappa(self):
         try:
-            return lambda theta: dolfin.as_matrix(
-                [
-                    [self._kappa_rad(theta), dolfin.Constant(0), dolfin.Constant(0)],
-                    [dolfin.Constant(0), self._kappa_rad(theta), dolfin.Constant(0)],
-                    [dolfin.Constant(0), dolfin.Constant(0), self._kappa_ax(theta)],
-                ]
-            )
+            return self._kappa
         except AttributeError:
-            raise IncompleteProblemException(
-                'kappa spline must be assigned to complete problem formulation')
+            kappa_rad_uflspline = UFLSpline(
+                self.material.kappa[0], self.V.ufl_element()
+                )
+            kappa_ax_uflspline = UFLSpline(
+                self.material.kappa[1], self.V.ufl_element()
+                )
+            self._kappa = lambda theta: dolfin.as_matrix(
+                    [[kappa_rad_uflspline(theta), dolfin.Constant(0)],
+                     [dolfin.Constant(0), kappa_ax_uflspline(theta)]])
 
-    @kappa.setter
-    def kappa(self, splines):
-        try:
-            spline_rad, spline_ax = splines
-        except:
-            raise ValueError('Two splines must be provided to construct kappa')
-
-        self._kappa_rad = UFLSpline(spline_rad, self.V.ufl_element())
-        self._kappa_ax = UFLSpline(spline_ax, self.V.ufl_element())
+            return self._kappa
 
     def compute_welding_depth(self, evo):
         return core.compute_welding_size(
                     evo,
                     self.V,
-                    self.liquidus - dolfin.DOLFIN_EPS,
+                    self.material.liquidus,
                     self.space_domain.x,
                     self.space_domain.ds(0),
         )
@@ -208,7 +186,7 @@ class Problem:
         return core.compute_welding_size(
                     evo,
                     self.V,
-                    self.liquidus -dolfin.DOLFIN_EPS,
+                    self.material.liquidus,
                     self.space_domain.x,
                     self.space_domain.ds(1) + self.space_domain.ds(2),
         )

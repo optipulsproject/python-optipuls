@@ -1,5 +1,7 @@
-from .core import project_Dj
 from numpy import sqrt
+
+from .core import project_Dj
+from .utils.iterators import get_func_values
 
 
 class Simulation():
@@ -111,6 +113,27 @@ class Simulation():
             return self._penalty_velocity_vector
 
     @property
+    def velocity_avg_vector(self):
+        try:
+            return self._velocity_avg_vector
+        except AttributeError:
+            self._velocity_avg_vector = \
+                self.problem.vectorize_penalty_term(
+                    self.evo,
+                    lambda k, theta_k, theta_kp1: \
+                        self.problem.integral(
+                                self.problem.velocity(
+                                        theta_k,
+                                        theta_kp1,
+                                        mean=True,
+                                        x=self.problem.space_domain.x,
+                                    )
+                            ),
+                    )
+            return self._velocity_avg_vector
+
+
+    @property
     def penalty_velocity_total(self):
         try:
             return self._penalty_velocity_total
@@ -166,14 +189,13 @@ class Simulation():
             return self._temp_target_point_vector
         except AttributeError:
             self._temp_target_point_vector = \
-                self.problem.temp_target_point_vector(self.evo)
+                self.temp_at_point_vector(self.problem.target_point)
             return self._temp_target_point_vector
 
     def temp_at_point_vector(self, point):
         '''Provides the temperature evolution at a given point.'''
 
-        return self.problem.temp_at_point_vector(self.evo, point)
-
+        return get_func_values(self.evo, self.problem.V, point)
 
     @property
     def energy_total(self):

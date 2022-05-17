@@ -1,33 +1,46 @@
+from itertools import cycle
+
 import numpy as np
 import scipy.ndimage
-from matplotlib import pyplot as plt
-# from matplotlib import colors
+import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
+
 
 size_inches = (12, 8)
-metropolis_orange = "#EB811B"
 
 
-def control_plot(*controls, labels=None, outfile=None, **kwargs):
+def control_plot(
+        *controls,
+        title='controls',
+        labels=None,
+        outfile=None,
+        scatter=False,
+        timeline=None,
+        y_max=1,
+        size_inches=size_inches,
+        **kwargs,
+    ):
 
     fig, ax = plt.subplots()
-    fig.set_size_inches(12,8)
+    fig.set_size_inches(*size_inches)
+    ax.set_title(title)
+    ax.set_ylim(0, y_max)
 
-    ax.set_title('Control')
-
-    x = np.arange(len(controls[0]))
-    # ax.set_xticks(x)
+    if not timeline:
+        timeline = np.arange(len(controls[0]))
 
     if not labels:
-        labels = ['control ' + str(i+1) for i in range(len(controls))]
+        labels = [f'control_{ind}' for ind, _ in enumerate(controls)]
 
-    for control, label in zip(controls, labels):
-        # ax.scatter(x, objective, label=label, zorder=2)
-        ax.scatter(x, control, color='purple', zorder=0, label=label)
-        ax.plot(x, control, color='purple', zorder=1)
+    for control, label, color in zip(
+            controls,
+            labels,
+            cycle(mcolors.TABLEAU_COLORS.keys())):
+        if scatter:
+            ax.scatter(timeline, control, color=color, zorder=0, marker='x')
+        ax.plot(timeline, control, color=color, zorder=1, label=label)
 
-    ax.fill_between(x, controls[0], controls[-1], alpha=0.2, color='blue')
-
-    ax.legend(loc=2)
+    ax.legend()
 
     plt.tight_layout()
     if not outfile:

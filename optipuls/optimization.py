@@ -2,21 +2,29 @@ import numpy as np
 
 from .simulation import Simulation
 
-
-class DescendLoopException(Exception):
+class DescendException(Exception):
     pass
 
-class DescendToleranceException(Exception):
-    pass
+class DescendLoopException(DescendException):
+    message = 'The descend procedure has looped.'
+
+class DescendToleranceException(DescendException):
+    message = 'Given tolerance was reached.'
+
+class DescendObjectiveException(DescendException):
+    message = 'The objective value decreases slow.'
 
 
-def gradient_descent(simulation,
-                     iter_max=50,
-                     step_init=1,
-                     tolerance=10**-9,
-                     sigma=10**-2,
-                     beta=.5,
-                     step_prediction=False):
+def gradient_descent(
+        simulation,
+        iter_max=50,
+        step_init=1.,
+        tolerance=1e-9,
+        descent_rate_min=1e-4,
+        sigma=1e-2,
+        beta=.5,
+        step_prediction=False,
+    ):
     '''Runs the gradient descent procedure.
 
     Parameters:
@@ -50,7 +58,7 @@ def gradient_descent(simulation,
         step = step_init
         problem = simulation.problem
 
-        print(f"{'i':>3}.{'j':<2}{'step':>15}{'J':>15}{'norm(Dj)':>15}{'norm(PDj)':>15}")
+        print(f"{'i':>3}.{'j':<2}{'step':>15}{'J':>15}{'norm(Dj)':>15}{'norm(PDj)':>15}{'descent_rate':>15}")
         print(f"{simulation.J:36.7e}{simulation.Dj_norm:15.7e}{simulation.PDj_norm:15.7e}")
 
         for i in range(1, iter_max + 1):
@@ -71,7 +79,7 @@ def gradient_descent(simulation,
                 if simulation_trial.J < simulation.J - sigma * step * simulation.Dj_norm2:
                     break
 
-                print(f"{simulation_trial.J:15.7e}{13*'-':>15}{13*'-':>15}")
+                print(f"{simulation_trial.J:15.7e}{13*'-':>15}{13*'-':>15}{13*'-':>15}")
                 j += 1
                 step *= beta
 
@@ -81,22 +89,22 @@ def gradient_descent(simulation,
             if j==0:
                 step /= beta
 
+            descent_rate = 1. - simulation_trial.J / simulation.J
             simulation = simulation_trial
             descent.append(simulation)
-            print(f"{simulation.J:15.7e}{simulation.Dj_norm:15.7e}{simulation.PDj_norm:15.7e}")
+
+            print(f"{simulation.J:15.7e}{simulation.Dj_norm:15.7e}{simulation.PDj_norm:15.7e}{descent_rate:15.7e}")
+
+            if descent_rate < descent_rate_min:
+                raise DescendObjectiveException
 
         else:
             print('Maximal number of iterations was reached.')
 
     except KeyboardInterrupt:
         print('\nInterrupted by user...')
-    except DescendLoopException:
-        print('\nThe descend procedure has looped since control reached '
-              'the boundary of the feasible set:\n'
-              'project(control_next) == control_current.')
-    except DescendToleranceException:
-        print('\nThe descend procedure was interrupted since\n'
-              'simulation.PDj_norm < tolerance.')
+    except DescendException as e:
+        print(e.message)
 
     print('Terminating.')
 

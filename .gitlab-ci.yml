@@ -1,19 +1,42 @@
-before_script:
-  - echo -n $CI_REGISTRY_TOKEN | docker login -u "$CI_REGISTRY_USER" --password-stdin
+stages:
+  - docker
+  - test
 
 docker build:
+  stage: docker
   image: docker:stable
   script:
-    - docker build . -f docker/Dockerfile.optipuls -t optipulsproject/optipuls:$CI_COMMIT_REF_SLUG -t optipulsproject/optipuls:latest
+    - docker build . -f docker/Dockerfile.optipuls
+      -t optipulsproject/optipuls:$CI_COMMIT_SHORT_SHA
+      -t optipulsproject/optipuls:$CI_COMMIT_REF_SLUG
+      -t optipulsproject/optipuls:latest
   only:
     refs:
       - develop
 
 docker push:
+  stage: docker
   image: docker:stable
   script:
+    - echo -n $CI_REGISTRY_TOKEN | docker login -u "$CI_REGISTRY_USER" --password-stdin
+    - docker push optipulsproject/optipuls:$CI_COMMIT_SHORT_SHA
     - docker push optipulsproject/optipuls:$CI_COMMIT_REF_SLUG
     - docker push optipulsproject/optipuls:latest
   only:
     refs:
       - develop
+
+unittest:
+  stage: test
+  image: optipulsproject/optipuls:$CI_COMMIT_SHORT_SHA
+  script:
+    - python3 -m unittest discover -s tests/unit
+
+gradient_test:
+  stage: test
+  image: optipulsproject/optipuls:$CI_COMMIT_SHORT_SHA
+  script:
+    - python3 tests/integration/gradient_test.py --outdir ./output
+  artifacts:
+    paths:
+      - ./output/gradient_test.png
