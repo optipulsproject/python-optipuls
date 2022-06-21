@@ -1,9 +1,10 @@
 FROM quay.io/fenicsproject/stable:latest
 COPY . /home/fenics/src/python-optipuls
 RUN python3 -m pip install --upgrade pip
-RUN python3 -m pip install importlib_resources
+RUN python3 -m pip install --upgrade importlib_resources matplotlib meshio
 RUN python3 -m pip install /home/fenics/src/python-optipuls
-RUN python3 -m pip install --upgrade matplotlib
+RUN apt-get -y update
+RUN apt-get -y install python3-h5py
 WORKDIR /home/fenics/shared
 CMD ["/bin/bash"]
 ENTRYPOINT []

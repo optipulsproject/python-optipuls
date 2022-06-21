@@ -10,9 +10,6 @@ docker build:
       -t optipulsproject/optipuls:$CI_COMMIT_SHORT_SHA
       -t optipulsproject/optipuls:$CI_COMMIT_REF_SLUG
       -t optipulsproject/optipuls:latest
-  only:
-    refs:
-      - develop
 
 docker push:
   stage: docker
@@ -22,9 +19,6 @@ docker push:
     - docker push optipulsproject/optipuls:$CI_COMMIT_SHORT_SHA
     - docker push optipulsproject/optipuls:$CI_COMMIT_REF_SLUG
     - docker push optipulsproject/optipuls:latest
-  only:
-    refs:
-      - develop
 
 unittest:
   stage: test
