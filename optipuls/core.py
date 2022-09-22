@@ -82,8 +82,8 @@ def a(u_k, u_kp1, v, control_k,
 
     a_ = vhc(u_k) * (u_kp1 - u_k) * v * dx\
        + dt * inner(dot(kappa(u_k), grad(u_avg)), grad(v)) * dx\
-       - dt * Constant(control_k) * laser_bc(x) * v * ds(61)\
-       - dt * cooling_bc(u_avg) * v * (ds(61) + ds(62))
+       - dt * Constant(control_k) * laser_bc(x) * v * ds(1)\
+       - dt * cooling_bc(u_avg) * v * (ds(1) + ds(2))
 
     return a_
 
@@ -133,7 +133,15 @@ def solve_forward(a, V, theta_init, control):
     # solve forward, i.e. theta_k -> theta p_kp1, k = 0, 1, 2, ..., Nt-1
     for k in range(Nt):
         F = a(theta_k, theta_kp1, v, control[k])
-        dolfin.solve(F == 0, theta_kp1)
+        dolfin.solve(
+            F == 0, theta_kp1,
+            solver_parameters={
+                'newton_solver': {
+                    'linear_solver': 'cg',
+                    'preconditioner': 'hypre_amg'
+                }
+            },
+        )
         evo[k+1] = theta_kp1.vector().get_local()
 
         # preparing for the next iteration
@@ -213,7 +221,15 @@ def solve_adjoint(evo, control, ps_magnitude, target_point, a, V, j):
         point_source = dolfin.PointSource(V, target_point, ps_magnitude[k-1])
         point_source.apply(b)
 
-        dolfin.solve(A, p_km1.vector(), b)
+        dolfin.solve(
+            A, p_km1.vector(), b, 'cg', 'hypre_amg'
+            # solver_parameters={
+            #     "newton_solver": {
+            #         'linear_solver': 'bicgstab',
+            #         'preconditioner': 'hypre_amg'
+            #     }
+            # },
+        )
  
         evo_adj[k-1] = p_km1.vector().get_local()
 
@@ -225,7 +241,7 @@ def solve_adjoint(evo, control, ps_magnitude, target_point, a, V, j):
     return evo_adj
 
 
-def Dj(evo_adj, control, V, control_ref, beta_control, beta_welding, laser_pd,
+def Dj(evo_adj, control, V, control_ref, beta_control, beta_welding, laser_bc,
        x, ds):
     '''Calculates the gradient of the cost functional for the given control.
 
@@ -254,7 +270,7 @@ def Dj(evo_adj, control, V, control_ref, beta_control, beta_welding, laser_pd,
 
     for i in range(Nt):
         p.vector().set_local(evo_adj[i])
-        z[i] = dolfin.assemble(p * laser_pd(x) * ds(61))
+        z[i] = dolfin.assemble(p * laser_bc(x) * ds(1))
     
     Dj = beta_control * (control - control_ref) - z
 
