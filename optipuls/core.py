@@ -16,9 +16,12 @@ def laser_bc(control_k, laser_pd):
 def gaussian_density(x, sigma, mu):
     pass
 
-def uniform_density(x, radius, center=(0,0)):
+def uniform_density(x, radius, center=(0, 0, 0)):
     return conditional(
-        le((x[0] - center[0])**2 + (x[1] - center[1])**2, radius**2),
+        And(
+            le((x[0] - center[0])**2 + (x[1] - center[1])**2, radius**2),
+            le(abs(x[2]), DOLFIN_EPS),
+        ),
         1., 0.
         )
 
@@ -35,18 +38,18 @@ def norm(dt, vector):
     '''Calculates L2[0,T] norm.'''
     return np.sqrt(norm2(dt, vector))
 
-def integral(form, x):
-    return form * x[0] * dx
+def integral(form, x, jacobian):
+    return form * jacobian * dx
 
-def integral2(form, x):
-    return form**2 * dx
+def integral2(form, x, jacobian):
+    return form**2 * jacobian * dx
 
 def avg(u_k, u_kp1, implicitness):
     return implicitness * u_kp1 + (1 - implicitness) * u_k
 
 
 def a(u_k, u_kp1, v, control_k,
-      vhc, kappa, cooling_bc, laser_bc, dt, implicitness, x, ds):
+      vhc, kappa, cooling_bc, laser_bc, dt, implicitness, x, ds, jacobian):
     '''UFL form for the lhs of the forward equation (one time step).
 
     Parameters:
@@ -80,10 +83,10 @@ def a(u_k, u_kp1, v, control_k,
     '''
     u_avg = avg(u_k, u_kp1, implicitness)
 
-    a_ = vhc(u_k) * (u_kp1 - u_k) * v * dx\
-       + dt * inner(dot(kappa(u_k), grad(u_avg)), grad(v)) * dx\
-       - dt * Constant(control_k) * laser_bc(x) * v * ds(1)\
-       - dt * cooling_bc(u_avg) * v * (ds(1) + ds(2))
+    a_ = vhc(u_k) * (u_kp1 - u_k) * v * jacobian * dx\
+       + dt * inner(dot(kappa(u_k), grad(u_avg)), grad(v)) * jacobian * dx\
+       - dt * Constant(control_k) * laser_bc(x) * v * jacobian * ds\
+       - dt * cooling_bc(u_avg) * v * jacobian * ds
 
     return a_
 
@@ -242,7 +245,7 @@ def solve_adjoint(evo, control, ps_magnitude, target_point, a, V, j):
 
 
 def Dj(evo_adj, control, V, control_ref, beta_control, beta_welding, laser_bc,
-       x, ds):
+       x, ds, jacobian):
     '''Calculates the gradient of the cost functional for the given control.
 
 
@@ -270,7 +273,7 @@ def Dj(evo_adj, control, V, control_ref, beta_control, beta_welding, laser_bc,
 
     for i in range(Nt):
         p.vector().set_local(evo_adj[i])
-        z[i] = dolfin.assemble(p * laser_bc(x) * ds(1))
+        z[i] = dolfin.assemble(p * laser_bc(x) * jacobian * ds)
     
     Dj = beta_control * (control - control_ref) - z
 

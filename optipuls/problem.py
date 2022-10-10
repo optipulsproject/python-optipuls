@@ -37,7 +37,9 @@ class Problem:
                     self.space_domain.R_laser,
                     ) * self.laser_pd,
                 self.time_domain.dt, self.implicitness,
-                self.space_domain.x, self.space_domain.ds)
+                self.space_domain.x, self.space_domain.ds,
+                self.jacobian,
+                )
 
     def bc_laser(self, control_k):
         return core.laser_bc(control_k, self.laser_pd)
@@ -59,7 +61,9 @@ class Problem:
                     self.space_domain.R_laser,
                     ) * self.laser_pd,
                 self.space_domain.x,
-                self.space_domain.ds)
+                self.space_domain.ds,
+                self.jacobian,
+                )
 
     def compute_evo_vel(self, evo, velocity_max):
         return core.compute_evo_vel(
@@ -126,12 +130,10 @@ class Problem:
         return cost
 
     def integral(self, form):
-        x = self.space_domain.x
-        return core.integral(form, x)
+        return core.integral(form, self.space_domain.x, self.jacobian)
 
     def integral2(self, form):
-        x = self.space_domain.x
-        return core.integral2(form, x)
+        return core.integral2(form, self.space_domain.x, self.jacobian)
 
     @property
     def control_ref(self):
@@ -175,6 +177,17 @@ class Problem:
 
             return self._kappa
 
+    @property
+    def jacobian(self):
+        try:
+            return self._jacobian
+        except AttributeError:
+            self._jacobian = (
+                self.space_domain.x[0] if self.space_domain.dim == 2
+                else dolfin.Constant(1)
+                )
+            return self._jacobian
+
     def compute_welding_depth(self, evo):
         return core.compute_welding_size(
                     evo,
@@ -192,3 +205,4 @@ class Problem:
                     self.space_domain.x,
                     self.space_domain.ds(1) + self.space_domain.ds(2),
         )
+
