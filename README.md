@@ -1,7 +1,7 @@
 OptiPuls: a numerical model for single spot pulsed laser beam welding
 =====================================================================
 
-This repository contains a Python package `optipuls` which implements a numerical model for simulation and mathematical optimization of the single spot pulsed laser beam welding of aluminium alloys. Its implementation strongly relies on the [FEniCS][fenics] computing platform.
+This repository contains a Python package `optipuls` which implements a numerical model for simulation and mathematical optimization of the single spot pulsed laser beam welding of aluminium alloys. Its implementation strongly relies on the free and open-source [FEniCS][fenics] computing platform.
 
 ---
 
@@ -14,13 +14,17 @@ This repository contains a Python package `optipuls` which implements a numerica
 ![OptiPuls-preview](assets/3d_resized.png)
 
 
+## Description
+
+The package implements a [mathematical problem for pulsed laser beam welding][paper-onespot] and provides a bundle of domain-specific abstractions, simulation and optimization routines. It is based on the free and open-source [FEniCS][fenics] compution platform for solving partial differential equations (PDEs).
+
 ## Requirements
 
 To run simulations and solve optimization problems, `optipuls` requires a working [FEniCS][fenics/installation] installation. Python packages `numpy`, `scipy` and `matplotlib` must be already installed as FEniCS' dependencies.
 
 [ParaView](https://www.paraview.org/) is recommended to inspect the simulation output.
 
-Notice, that installing FEniCS with its dependencies might be difficult on systems other than Debian or Ubuntu, which are the [officially supported][fenics/installation/ubuntu] by FEniCS developers.
+Notice, that installing FEniCS with its dependencies might be difficult on systems other than Debian or Ubuntu, which are the ones [officially supported][fenics/installation/ubuntu] by FEniCS developers.
 Therefore, it is recommended to use `optipuls` in a docker container using [optipulsproject/optipuls] docker image which is built on top of [fenicsproject/stable] docker image. Please refer to the section below.
 
 
@@ -42,6 +46,8 @@ python3 -m pip install git+https://github.com/optipulsproject/optipuls
 
 ### Running `optipuls` in a docker container
 
+The officially recommended way to run numerical simulations and optimizations with `optipuls` package is to use docker containers. Docker software must be installed on the host system.
+
 Assuming that `/scratch/optipuls` is the desired location for the numerical artifacts and dijitso cache on the host system, the following command will mount the scratch directory and the current working directory inside a docker container and execute `run.py`:
 ```
 $ docker run \
@@ -54,8 +60,8 @@ $ docker run \
 
 ## Related papers
 
-- [An Optimal Control Problem for Single-Spot Pulsed Laser Welding][paper-onespot]
-
+- [An Optimal Control Problem for Single-Spot Pulsed Laser Welding][paper-onespot], [arXiv](https://arxiv.org/abs/2109.10788v2)
+  
 
 ## License
 
