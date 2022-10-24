@@ -36,13 +36,18 @@ problem.time_domain = time_domain
 # experimental
 
 mesh = dolfin.Mesh()
-with dolfin.XDMFFile("examples/mesh/singlespot-XZ/singlespot_XZ.xdmf") as infile:
+with dolfin.XDMFFile("examples/mesh/singlespot-XYZ/singlespot_XYZ.xdmf") as infile:
     infile.read(mesh)
 
+mesh_boundaries = dolfin.MeshValueCollection("size_t", mesh, 2)
+with dolfin.XDMFFile("examples/mesh/singlespot-XYZ/singlespot_XYZ_boundaries.xdmf") as infile:
+    infile.read(mesh_boundaries, "ids")
+
 space_domain = SpaceDomain(0.0050, 0.0002, 0.0005)
-space_domain.dim = 2
+space_domain.dim = 3
 space_domain._x = dolfin.SpatialCoordinate(mesh)
-space_domain._ds = dolfin.Measure('ds', domain=mesh)
+subdomain_data = dolfin.cpp.mesh.MeshFunctionSizet(mesh, mesh_boundaries)
+space_domain._ds = dolfin.Measure('ds', domain=mesh, subdomain_data=subdomain_data)
 
 problem.space_domain = space_domain
 
