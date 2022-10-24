@@ -170,18 +170,22 @@ class Problem:
                 self.material.kappa[1], self.V.ufl_element()
                 )
             self._kappa = (
+                (
                 lambda theta: dolfin.as_matrix(
                     [[kappa_rad_uflspline(theta), dolfin.Constant(0), dolfin.Constant(0)],
                      [dolfin.Constant(0), dolfin.Constant(0), dolfin.Constant(0)],
                      [dolfin.Constant(0), dolfin.Constant(0), kappa_ax_uflspline(theta)]]
-                    ) if self.space_domain.dim == 2
+                    )
+                ) if self.space_domain.dim == 2
                 else
+                (
                 lambda theta: dolfin.as_matrix(
                     [[kappa_rad_uflspline(theta), dolfin.Constant(0), dolfin.Constant(0)],
                      [dolfin.Constant(0), kappa_rad_uflspline(theta), dolfin.Constant(0)],
                      [dolfin.Constant(0), dolfin.Constant(0), kappa_ax_uflspline(theta)]]
                     )
                 )
+            )
 
             return self._kappa
 
