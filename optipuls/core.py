@@ -1,9 +1,8 @@
 import dolfin
 from dolfin import dx, Constant, DOLFIN_EPS
 import ufl
-from ufl import inner, grad, conditional, ge, gt, lt, le, And
+from ufl import inner, grad, dot, conditional, ge, gt, lt, le, And
 import numpy as np
-
 from .utils.iterators import (
         func_generator,
         func_pair_generator,
@@ -14,11 +13,21 @@ from .utils.iterators import (
 def laser_bc(control_k, laser_pd):
     return laser_pd * Constant(control_k)
 
+def gaussian_density(x, sigma, mu):
+    pass
+
+def uniform_density(x, radius, center=(0, 0, 0)):
+    return conditional(
+        And(
+            le((x[0] - center[0])**2 + (x[1] - center[1])**2, radius**2),
+            le(abs(x[2]), DOLFIN_EPS),
+        ),
+        1., 0.
+        )
 
 def cooling_bc(theta, temp_amb, convection_coeff, radiation_coeff):
     return - convection_coeff * (theta - temp_amb)\
            - radiation_coeff * (theta**4 - temp_amb**4)
-
 
 def norm2(dt, vector):
     '''Calculates the squared L2[0,T] norm.'''
@@ -29,24 +38,55 @@ def norm(dt, vector):
     '''Calculates L2[0,T] norm.'''
     return np.sqrt(norm2(dt, vector))
 
-def integral(form, x):
-    return form * x[0] * dx
+def integral(form, x, jacobian):
+    return form * jacobian * dx
 
-def integral2(form, x):
-    return form**2 * x[0] * dx
+def integral2(form, x, jacobian):
+    return form**2 * jacobian * dx
 
 def avg(u_k, u_kp1, implicitness):
     return implicitness * u_kp1 + (1 - implicitness) * u_k
 
 
 def a(u_k, u_kp1, v, control_k,
-      vhc, kappa, cooling_bc, laser_bc, dt, implicitness, x, ds):
+      vhc, kappa, cooling_bc, laser_bc, dt, implicitness, x, ds, jacobian):
+    '''UFL form for the lhs of the forward equation (one time step).
+
+    Parameters:
+        u_k, u_kp1 (dolfin.Function):
+            Two consequent states of the temperature distribution, i.e. the
+            current (known) and the next (unknow) time steps.
+        v (dolfin.TestFunction):
+            A test function.
+        control_k (float):
+            The control value for the current time step.
+        vhc (UFLSpline, i.e. dolfin.Function -> UFL form):
+            Effective volumetric heat capacity coefficient.
+        kappa (UFLSpline, i.e. dolfin.Function -> UFL form):
+            Thermal conductivity coefficient. Must be a NxN matrix or a 1xN
+            vector where N is the dimension of the space domain.
+        cooling_bc (dolfin.Function -> UFL form):
+            Cooling boundary condition.
+        laser (float -> UFL form):
+            Laser (energy input) boundary condition.
+        dt (float):
+            Length of the time step.
+        implicitness (float):
+            Implicitness coefficient.
+        x (dolfin.SpatialCoordinate):
+            Spartial coordinate inside the domain.
+        ds (dolfin.Measure):
+            Measure on the boundaries of the domain with the following markers:
+            (1) boundary affected by laser's radiation;
+            (2) boundary affected by cooling only.
+
+    '''
     u_avg = avg(u_k, u_kp1, implicitness)
 
-    a_ = vhc(u_k) * (u_kp1 - u_k) * v * x[0] * dx\
-       + dt * inner(kappa(u_k) * grad(u_avg), grad(v)) * x[0] * dx\
-       - dt * laser_bc(control_k) * v * x[0] * ds(1)\
-       - dt * cooling_bc(u_avg) * v * x[0] * (ds(1) + ds(2) + ds(4))
+    a_ = vhc(u_k) * (u_kp1 - u_k) * v * jacobian * dx\
+       + dt * inner(dot(kappa(u_k), grad(u_avg)), grad(v)) * jacobian * dx\
+       - dt * Constant(control_k) * laser_bc(x) * v * jacobian * ds\
+       - dt * cooling_bc(u_avg) * v * jacobian * ds
 
     return a_
 
@@ -63,7 +103,7 @@ def solve_forward(a, V, theta_init, control):
 
     Parameters:
         a: (u_k, u_kp1, v, control_k) -> UFL form
-            The RHS variational form.
+            The lhs variational form.
         V: dolfin.FunctionSpace
             The FEM space of the problem being solved.
         theta_init: dolfin.Function(V)
@@ -74,7 +114,8 @@ def solve_forward(a, V, theta_init, control):
     Returns:
         evo: ndarray
             The coefficients of the calculated solution in the basis of
-            the space V at each time step including the given initial state.
+            the space V at each time step including the given initial state,
+            i.e. len(evo) == len(control) + 1.
             
     '''
 
@@ -95,7 +136,15 @@ def solve_forward(a, V, theta_init, control):
     # solve forward, i.e. theta_k -> theta p_kp1, k = 0, 1, 2, ..., Nt-1
     for k in range(Nt):
         F = a(theta_k, theta_kp1, v, control[k])
-        dolfin.solve(F == 0, theta_kp1)
+        dolfin.solve(
+            F == 0, theta_kp1,
+            solver_parameters={
+                'newton_solver': {
+                    'linear_solver': 'cg',
+                    'preconditioner': 'hypre_amg'
+                }
+            },
+        )
         evo[k+1] = theta_kp1.vector().get_local()
 
         # preparing for the next iteration
@@ -175,7 +224,15 @@ def solve_adjoint(evo, control, ps_magnitude, target_point, a, V, j):
         point_source = dolfin.PointSource(V, target_point, ps_magnitude[k-1])
         point_source.apply(b)
 
-        dolfin.solve(A, p_km1.vector(), b)
+        dolfin.solve(
+            A, p_km1.vector(), b, 'cg', 'hypre_amg'
+            # solver_parameters={
+            #     "newton_solver": {
+            #         'linear_solver': 'bicgstab',
+            #         'preconditioner': 'hypre_amg'
+            #     }
+            # },
+        )
  
         evo_adj[k-1] = p_km1.vector().get_local()
 
@@ -187,8 +244,8 @@ def solve_adjoint(evo, control, ps_magnitude, target_point, a, V, j):
     return evo_adj
 
 
-def Dj(evo_adj, control, V, control_ref, beta_control, beta_welding, laser_pd,
-       x, ds):
+def Dj(evo_adj, control, V, control_ref, beta_control, beta_welding, laser_bc,
+       x, ds, jacobian):
     '''Calculates the gradient of the cost functional for the given control.
 
 
@@ -216,9 +273,9 @@ def Dj(evo_adj, control, V, control_ref, beta_control, beta_welding, laser_pd,
 
     for i in range(Nt):
         p.vector().set_local(evo_adj[i])
-        z[i] = dolfin.assemble(p * x[0] * ds(1))
+        z[i] = dolfin.assemble(p * laser_bc(x) * jacobian * ds)
     
-    Dj = beta_control * (control - control_ref) - laser_pd*z
+    Dj = beta_control * (control - control_ref) - z
 
     return Dj
 
