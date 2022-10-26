@@ -1,7 +1,7 @@
 OptiPuls in Docker
 ==================
 
-The ``optipuls`` python package is based on the free and open-source `FEniCS`_ computing platform for solving partial differential equations (PDEs). The officially recommended way to run FEniCS is by using their `official docker images <https://fenics.readthedocs.io/projects/containers/en/latest/>`_.
+The ``optipuls`` python package is based on the free and open-source `FEniCS`_ computing platform for solving partial differential equations (PDEs). The FEniCS project ships with its `official docker images <https://fenics.readthedocs.io/projects/containers/en/latest/>`_.
 
 .. _FEniCS: https://fenicsproject.org/
 
