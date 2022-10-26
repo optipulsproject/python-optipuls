@@ -9,8 +9,11 @@ OptiPuls: a numerical model for single spot pulsed laser beam welding
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
+   :glob:
 
    intro
+   docker
+   extras
 
 Indices and tables
 ==================
