@@ -11,7 +11,7 @@ This repository contains a Python package `optipuls` which implements a numerica
 
 ---
 
-![OptiPuls-preview](assets/3d_resized.png)
+![OptiPuls-preview](docs/pics/3d_resized.png)
 
 
 ## Description
