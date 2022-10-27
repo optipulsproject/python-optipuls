@@ -1,7 +1,7 @@
 An Optimal Control Problem for Single Spot Laser Pulse Welding
 ==============================================================
 
-**Repository:** https://github.com/optipulsproject/optimal-control-single-spot
+**Repository:** https://github.com/optipulsproject/optimal-control-spot-welding
 
 
 Abstract
@@ -60,8 +60,8 @@ If you already have FEniCS installed locally, you can use python virtual environ
 
 Once the depencdencies are satisfied, reproducing of the results is as simple as running ``make`` in the root of the project::
 
-	git clone https://github.com/optipulsproject/optimal-control-single-spot
-	cd optimal-control-single-spot
+	git clone https://github.com/optipulsproject/optimal-control-spot-welding
+	cd optimal-control-spot-welding
 	make -j$(nproc)
 
 Make will run the computations, produce the plots, the tables, and the final ``manuscript-numapde-preprint.pdf`` file.
@@ -74,15 +74,15 @@ Prebuilt `optipuilsproject <https://hub.docker.com/orgs/optipulsproject>`_ docke
 
 Pull neccessary images::
 
-	docker pull optipulsproject/optipuls:optimal-control-single-spot
-	docker pull optipulsproject/tabulate
-	docker pull optipulsproject/publications
+	docker pull optipulsproject/optipuls:optimal-control-spot-welding
+	docker pull optipulsproject/tabulate:latest
+	docker pull optipulsproject/publications:latest
 
 Make plots (entails making of the numerical artifacts)::
 
 	docker run \
 	  -v $(pwd):/home/fenics/shared \
-	  optipulsproject/optipuls:optimal-control-single-spot \
+	  optipulsproject/optipuls:optimal-control-spot-welding \
 	  make plots.all -j$(nproc)
 
 Make tables::

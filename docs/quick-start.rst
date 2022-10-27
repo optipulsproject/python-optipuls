@@ -31,7 +31,7 @@ The changed command line prompt indicates that the commands will be now run insi
 
 
 Linear Rampdown Simulation
-^^^^^^^^^^^^^^^^^^^^^^^^^^
+--------------------------
 
 Perform the following steps to run a simple built-in numerical simulation for a linear rampdown laser pulse shape.
 
@@ -58,9 +58,9 @@ In order to modify this simple example make a copy of the file ``simulation_line
 
 
 Zeroguess Optimization
-^^^^^^^^^^^^^^^^^^^^^^
+----------------------
 
-In a similar way toy the previous example, perform the following steps to run a simple built-in numerical optimization with zero pulse shape as an initial guess. The optimizer will be increasing the laser power untill the desired depth of the weld will be achieved.
+In a similar way toy the previous example, perform the following steps to run a simple built-in numerical optimization with zero pulse as the initial guess. The optimizer will be increasing the laser power untill the desired depth of the weld will be achieved.
 
 In a similar way toy the previous example, start the container, open the directory ``python-optipuls`` source code and run ``examples/optimization_zeroguess.py``::
 
@@ -81,4 +81,4 @@ One can play around and modify the optimization parameters::
 	problem.target_point = dolfin.Point(0, 0, -.7 * space_domain.Z)
 	problem.pow_ = 20
 
-The impact of these parameters on the produced optimized pulse shapes is explained in the paper :doc:`optimal-control-single-spot`.
+The impact of these parameters on the produced optimized pulse shapes is explained in the paper :doc:`optimal-control-spot-welding`.

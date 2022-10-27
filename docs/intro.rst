@@ -1,5 +1,7 @@
-Introduction
+Project Info
 ============
+
+.. figure:: pics/3d_resized.png
 
 | **Authors:** Dmytro Strelnikov, Roland Herzog
 | **Funding:** Funding: Project IGF 20.826B (DVS I2.3005) in Forschungsvereinigung Schweißen und verwandte Verfahren e.V. of the `Deutschen Verbandes für Schweißen und verwandte Verfahren e.V. <https://www.die-verbindungs-spezialisten.de/>`_
@@ -11,7 +13,10 @@ This documentations is dedicated to the python package `optipuls` which implemen
 
 This software package allows an expert user to create numerical simulations for the single-spot pulsed laser beam welding process, formulate in a flexible way and solve the corresponding optimal control problems, and finally generate optimized laser pulse shapes. These pulse shapes can be further programmed into a laser's power source in order to obtain fast, energy efficient, and crack-free welds.
 
-References
-----------
+
+Useful Links
+------------
 
 - https://github.com/optipulsproject/python-optipuls
+- https://github.com/optipulsproject/optimal-control-spot-welding
+- https://hub.docker.com/r/optipulsproject/optipuls

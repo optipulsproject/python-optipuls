@@ -15,8 +15,8 @@ Getting the OptiPuls docker image on a system with docker software installed is 
 	Status: Downloaded newer image for optipulsproject/optipuls:latest
 	docker.io/optipulsproject/optipuls:latest
 
-References
-----------
+Useful Links
+------------
 
 - `Docker Overview <https://docs.docker.com/get-started/overview/>`_
 - `Getting Started with Docker <https://docs.docker.com/get-started/>`_
