@@ -26,10 +26,10 @@ def control_plot(
     ax.set_title(title)
     ax.set_ylim(0, y_max)
 
-    if not timeline:
+    if timeline is None:
         timeline = np.arange(len(controls[0]))
 
-    if not labels:
+    if labels is None:
         labels = [f'control_{ind}' for ind, _ in enumerate(controls)]
 
     for control, label, color in zip(
