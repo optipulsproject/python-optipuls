@@ -15,7 +15,7 @@ This software package allows an expert user to create numerical simulations for 
 
 
 Useful Links
-------------
+^^^^^^^^^^^^
 
 - https://github.com/optipulsproject/python-optipuls
 - https://github.com/optipulsproject/optimal-control-spot-welding
