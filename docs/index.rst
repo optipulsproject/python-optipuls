@@ -11,6 +11,8 @@ OptiPuls: a numerical model for single spot pulsed laser beam welding
    intro
    install
    docker
+   quick-start
+   optimal-control-single-spot
    extras
 
 Indices and tables

@@ -66,9 +66,9 @@ Examples::
 	$ python3 mesh_convert.py --dim 3 --output singlespot_XYZ.xdmf
 	$ python3 mesh_convert.py --dim 2 --output singlespot_XZ.xdmf
 
-
+.. _paraview-helpers:
 ParaView Helpers
---------------------
+----------------
 
 `ParaView`_ is an open-source, multi-platform data analysis and visualization application. In OptiPuls it is used to inspect the output of the numerical simulation of the laser welding.
 
