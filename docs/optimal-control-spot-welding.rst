@@ -1,7 +1,8 @@
 An Optimal Control Problem for Single Spot Laser Pulse Welding
 ==============================================================
 
-**Repository:** https://github.com/optipulsproject/optimal-control-spot-welding
+| **Repository:** https://github.com/optipulsproject/optimal-control-spot-welding
+| **arXiv:** https://arxiv.org/abs/2109.10788v2
 
 
 Abstract
@@ -100,3 +101,4 @@ Make paper::
 	  -v $(pwd):/data \
 	  optipulsproject/publications:latest \
 	  make preprint
+
